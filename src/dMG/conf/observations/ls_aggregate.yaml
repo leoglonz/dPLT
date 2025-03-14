@@ -1,0 +1,20 @@
+name: ls_aggregate
+train_path: /projects/mhpi/leoglonz/data/extracted/land_subsidence/ls_train
+test_path: /projects/mhpi/leoglonz/data/extracted/land_subsidence/ls_test
+
+
+start_time: 2006/01/01
+end_time: 2024/12/31
+
+dynamic_vars: [
+  drawdown
+]
+static_vars: [
+  layer_count,
+  layer1_thickness,
+  layer2_thickness,
+  layer3_thickness,
+  layer4_thickness,
+  layer5_thickness,
+  soil_class,
+]

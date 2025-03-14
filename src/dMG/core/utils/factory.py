@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Type
 
 import torch
-from hydroDL2 import load_model as load_from_hydrodl
 from numpy.typing import NDArray
 
 from dMG.core.data.loaders.base import BaseLoader
@@ -17,6 +16,11 @@ from . import camel_to_snake
 sys.path.append('../dMG/')  # for tutorials
 
 import numpy as np
+
+try:
+    from hydroDL2 import load_model as load_from_hydrodl
+except ImportError:
+    print("HydroDL2 not found. Continuing without it.")
 
 #------------------------------------------#
 # If directory structure changes, update these module paths.

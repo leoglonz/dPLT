@@ -1,0 +1,116 @@
+defaults:
+    - _self_
+    - hydra: settings
+    - observations: ls_aggregate
+
+
+## General -------------------------------#
+mode: train  # train, test, train_test, predict
+multimodel_type: none  # none, pnn_parallel, pnn_sequential
+random_seed: 111111
+device: cuda
+gpu_id: 7
+
+data_loader: LsLoader
+data_sampler: LsSampler
+trainer: LsTrainer
+
+save_path: ../../results/ls
+trained_model: ''
+
+
+## Training ------------------------------#
+train:
+    start_time: 1999/10/01
+    end_time: 2008/09/30
+    target: [flow_sim]
+    optimizer: Adadelta
+    batch_size: 200
+    epochs: 51
+    start_epoch: 0
+    save_epoch: 1
+
+
+## Evaluation -------------------------------#
+test:
+    start_time: 1989/10/01
+    end_time: 1999/09/30
+    batch_size: 400
+    test_epoch: 1
+
+
+## Inference -------------------------------#
+predict:
+    start_time: 1989/10/01
+    end_time: 1999/09/30
+    batch_size: 400
+
+
+## Loss Function -------------------------#
+loss_function:
+    model: NseBatchLoss  # RmseCombLoss, NseBatchLoss, KgeBatchLoss
+    
+
+## dPL Model -----------------------------#
+dpl_model:
+    rho: 365
+    
+    phy_model:
+        model: [Terzaghi]  
+        nmul: 1
+        dy_drop: 0.0
+        lookback: 2
+        dynamic_params:
+            Terzaghi: [
+                # parLT,  # Layer thickness  <-- start w/ this
+                # parVR,  # Void Ratio
+                # parVCI,  # Virgin Compression Index  <-- start w/ this
+                # parRC,  # Recompression Index
+                # parOCR,  # Overconsolidation Ratio
+                # parK,  # Percent coarseness
+                # parMv,  # Coefficient of volume compressibility
+                parIES,  # Initial effective stress  <-- start w/ this
+            ]
+
+        nearzero: 1e-5
+
+        dynamic_vars: [
+            drawdown,
+        ]
+        static_vars: [
+            layer_count,
+            layer_thickness,
+            vr,
+            vci,
+            ri,
+            ocr,
+            k,
+            mv,
+            ies,
+        ]
+
+
+    nn_model:
+        model: CudnnLstmModel
+        dropout: 0.5
+        hidden_size: 256
+        learning_rate: 1.0
+        lr_scheduler: StepLR
+        lr_scheduler_params:
+            step_size: 10
+            gamma: 0.5
+        
+        dynamic_vars: [
+            drawdown,
+        ]
+        static_vars: [
+            layer_count,
+            layer_thickness,
+            vr,
+            vci,
+            ri,
+            ocr,
+            k,
+            mv,
+            ies,
+        ]
