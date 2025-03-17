@@ -137,8 +137,11 @@ def initialize_config(config: Union[DictConfig, dict]) -> Dict[str, Any]:
         config['trained_model'] = ''
 
     # Create output directories and add path to config.
+    # try:
     out_path = PathBuilder(config)
     config = out_path.write_path(config)
+    # except Exception as e:
+    #     pass
 
     # Convert string back to data type.
     config['dtype'] = eval(config['dtype'])

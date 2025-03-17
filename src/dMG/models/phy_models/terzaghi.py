@@ -33,6 +33,9 @@ class TerzaghiMultiLayer(torch.nn.Module):
         self.dynamic_params = []
         self.dy_drop = 0.0
         self.lookback = 2
+        self.layer_count = 1
+        self.learnable_layers = [0]
+        self.learnable_params = ['parLT']
         self.variables = ['gw_level']
         self.nearzero = 1e-5
         self.nmul = 1
@@ -48,6 +51,7 @@ class TerzaghiMultiLayer(torch.nn.Module):
             'parIES': [0, 100],  # Initial effective stress
         }
         self.water_unit_weight = 9.81  # kN/m³
+        self.min_stress = 10.0  # kPa
 
         if not device:
             self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -56,23 +60,23 @@ class TerzaghiMultiLayer(torch.nn.Module):
             # Overwrite defaults with config values.
             self.dy_drop = config.get('dy_drop', self.dy_drop)
             self.lookback = config.get('lookback', self.lookback)
+            self.layer_count = config.get('layer_count', self.layer_count)
+            self.learnable_layers = config.get('learnable_layers', self.learnable_layers)
             self.dynamic_params = config['dynamic_params'].get('Terzaghi', self.dynamic_params)
             self.variables = config.get('variables', self.variables)
             self.nearzero = config.get('nearzero', self.nearzero)
             self.nmul = config.get('nmul', self.nmul)
         self.set_parameters()
 
-        # self.dfLayers = dfLayers
-        # self.dfWaterlevel = dfWaterlevel
-        # self.dfSubsidence = dfSubsidence
-        # self.lookback = lookback
-        # self.water_unit_weight = 9.81  # kN/m³
-        # self.min_stress = 10.0  # kPa
-
     def set_parameters(self) -> None:
-        """Get physical parameters."""
+        """Get physical parameters.
+        
+        # of parameters = # of layers * # of parameters to learn per
+        layer * # of layers
+        """
         self.phy_param_names = self.parameter_bounds.keys()
-        self.learnable_param_count = len(self.phy_param_names) * self.nmul
+        self.learnable_param_count = len(self.learnable_params) \
+            * len(self.learnable_layers) * self.nmul
 
     def unpack_parameters(
             self,
@@ -162,45 +166,53 @@ class TerzaghiMultiLayer(torch.nn.Module):
                 )
         return param_dict
     
-    def _initialize_layer_weights(self, layer_data):
+    def _init_layer_weights(
+        self,
+        param_dict: Dict[str, torch.Tensor],
+    ) -> torch.Tensor:
+        """Compute layer weights per site."""
         weights = []
-        num_layers = len(layer_data)
-        for _, layer in layer_data.iterrows():
-            compressibility = layer['compression_index'] * (1 + layer['void_ratio'])
-            fine_fraction = (100 - layer['percent_coarse']) / 100
-            depth_factor = torch.exp(-layer['layer_number'] / num_layers)
+
+        for layer in range(self.layer_count):
+            compressibility = param_dict['parVCI'][:, layer] \
+                * (1 + param_dict['parVR'][:, layer])
+            fine_fraction = (100 - param_dict['parK'][:, layer]) / 100
+            depth_factor = torch.exp(- layer / self.layer_count)
+
             weight = compressibility * fine_fraction * depth_factor
             weights.append(weight)
+        weights = torch.tensor(weights, dtype=torch.float32, device=self.device)
 
-        weights = torch.tensor(weights, dtype=torch.float32)
         return weights / torch.sum(weights)
     
-
-    def _calculate_compression(self, layer, stress_change):
-        if torch.abs(stress_change) < 1e-6:
+    def _calculate_compression(
+        self,
+        param_dict: Dict[str, torch.Tensor],
+        stress_delta,
+    ) -> torch.Tensor:
+        """Calculate compression for a single layer."""
+        if torch.abs(stress_delta) < 1e-6:
             return 0.0
 
-        initial_stress = max(layer['initial_effective_stress'], self.min_stress)
-        final_stress = max(initial_stress + stress_change, self.min_stress)
+        stress_0 = max(param_dict['parIES'], self.stress_min)
+        stress_final = max(stress_0 + stress_delta, self.stress_min)
 
-        cc = layer['compression_index']
-        cr = layer['recompression_index']
-        e0 = layer['void_ratio']
-        ocr = layer['OCR']
-        precons_pressure = initial_stress * ocr
+        # Preconsolidation pressure
+        precon_p = stress_0 * param_dict['parOCR']
 
-        if final_stress <= precons_pressure:
-            compression = (layer['thickness'] * cr / (1 + e0)) * \
-                         torch.log(final_stress / initial_stress)
+        if stress_final <= precon_p:
+            compression = (
+                param_dict['parLT'] * param_dict['parRC'] / (1 + param_dict['parVR'])
+            ) * torch.log(stress_final / stress_0)
         else:
-            compression = (layer['thickness'] / (1 + e0)) * \
-                         (cr * torch.log(precons_pressure / initial_stress) +
-                          cc * torch.log(final_stress / precons_pressure))
+            compression = (param_dict['thickness'] / (1 + param_dict['parVR'])) * \
+                (
+                    param_dict['parRC'] * torch.log(precon_p / stress_0) +
+                    param_dict['parVCI'] * torch.log(stress_final / precon_p)
+                )
+        fine_frac = (100 - param_dict['percent_coarse']) / 100
 
-        fine_fraction = (100 - layer['percent_coarse']) / 100
-        compression *= (0.5 + 0.5 * fine_fraction)
-
-        return compression
+        return compression * (0.5 + 0.5 * fine_frac)
 
     def forward(
             self,
@@ -224,40 +236,40 @@ class TerzaghiMultiLayer(torch.nn.Module):
         all_results = []
         station_metrics = {}
 
-        stations = self.dfLayers['station_id'].unique()
+        n_tsteps = x_dict['forcings'].shape[0]
+        n_sites = x_dict['forcings'].shape[1]
 
-        for station in stations:
-            print(f"Processing station: {station}")
-            station_results = self.forward(station)
+        water_level = x_dict['forcings']
 
-            if station_results is not None:
-                station_results['station_id'] = station
-                all_results.append(station_results)
+        # Unpack parameters # NOTE: needs to be fixed
+        param_dict = self.unpack_parameters(parameters)
 
-                predictions = torch.tensor(station_results['predicted_subsidence'].values, dtype=torch.float32)
-                actuals = torch.tensor(station_results['actual_subsidence'].values, dtype=torch.float32)
+        # Initialize model state
+        vert_displacement = torch.zeros(
+            [n_tsteps, n_sites],
+            dtype=torch.float32,
+            device=self.device,
+        )
 
-                rmse = torch.sqrt(torch.mean((predictions - actuals) ** 2)).item()
-                r2 = 1 - torch.sum((predictions - actuals) ** 2).item() / torch.sum((actuals - actuals.mean()) ** 2).item()
+        for i in range(n_sites):
+            site_params = {}
+            for key in param_dict.keys():
+                site_params[key] = param_dict[key][:, i, :]
 
-                station_metrics[station] = {
-                    'RMSE': rmse,
-                    'R2': r2,
-                    'n_predictions': len(station_results)
-                }
+            layer_weights = self._init_layer_weights(site_params)
 
-        results_df = pd.concat(all_results, ignore_index=True)
-        metrics_df = pd.DataFrame(station_metrics).T
-
-        return results_df, metrics_df
-
+        out_dict = {
+            'vert_displacement': vert_displacement,
+        }
+        return out_dict
+        
     def PBM(self, station_id: int) -> torch.Tensor:
         station_layers = self.dfLayers[self.dfLayers['station_id'] == station_id].copy()
         station_subsidence = self.dfSubsidence[self.dfSubsidence['station_id'] == station_id].sort_values('Year')
         station_water = self.dfWaterlevel[self.dfWaterlevel['station_id'] == station_id].sort_values('year')
         
         
-        layer_weights = self._initialize_layer_weights(station_layers)
+        layer_weights = self._init_layer_weights(station_layers)
         water_changes = station_water.set_index('year')['level_change_mean'].to_dict()
 
         results = []

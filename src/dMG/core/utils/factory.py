@@ -207,16 +207,16 @@ def load_nn_model(
 
     # Number of inputs 'x' and outputs 'y' for the nn.
     if ensemble_list:
-        n_forcings = len(config['forcings'])
-        n_attributes = len(config['attributes'])
+        n_forcings = len(config['dynamic_vars'])
+        n_attributes = len(config['static_vars'])
         ny = len(ensemble_list)
 
         hidden_size = config['hidden_size']
         dr = config['dropout']
         name = config['model']
     else:
-        n_forcings = len(config['nn_model']['forcings'])
-        n_attributes = len(config['nn_model']['attributes'])
+        n_forcings = len(config['nn_model']['dynamic_vars'])
+        n_attributes = len(config['nn_model']['static_vars'])
         n_phy_params = phy_model.learnable_param_count
         ny = n_phy_params
 
@@ -226,7 +226,7 @@ def load_nn_model(
             hidden_size = config['nn_model']['hidden_size']
             dr = config['nn_model']['dropout']
 
-    nx = n_forcings + n_attributes
+    nx = n_forcings + n_attributes * config['phy_model']['layer_count']
     
     # Dynamically retrieve the model
     cls = load_component(

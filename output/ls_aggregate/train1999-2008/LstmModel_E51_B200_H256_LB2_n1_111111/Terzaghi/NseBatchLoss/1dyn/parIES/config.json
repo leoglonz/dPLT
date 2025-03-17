@@ -1,0 +1,135 @@
+{
+    "mode": "train",
+    "multimodel_type": null,
+    "random_seed": 111111,
+    "device": "cuda:7",
+    "gpu_id": 7,
+    "data_loader": "LsLoader",
+    "data_sampler": "LsSampler",
+    "trainer": "LsTrainer",
+    "save_path": "../output/",
+    "trained_model": "",
+    "train": {
+        "start_time": "1999/10/01",
+        "end_time": "2008/09/30",
+        "target": [
+            "flow_sim"
+        ],
+        "optimizer": "Adadelta",
+        "batch_size": 200,
+        "epochs": 51,
+        "start_epoch": 0,
+        "save_epoch": 1
+    },
+    "test": {
+        "start_time": "1989/10/01",
+        "end_time": "1999/09/30",
+        "batch_size": 400,
+        "test_epoch": 1
+    },
+    "predict": {
+        "start_time": "1989/10/01",
+        "end_time": "1999/09/30",
+        "batch_size": 400
+    },
+    "loss_function": {
+        "model": "NseBatchLoss"
+    },
+    "dpl_model": {
+        "rho": 365,
+        "phy_model": {
+            "model": [
+                "Terzaghi"
+            ],
+            "nmul": 1,
+            "dy_drop": 0.0,
+            "lookback": 2,
+            "layer_count": 9,
+            "dynamic_params": {
+                "Terzaghi": [
+                    "parIES"
+                ]
+            },
+            "nearzero": 1e-05,
+            "dynamic_vars": [
+                "drawdown"
+            ],
+            "static_vars": [
+                "layer_count",
+                "layer_thickness",
+                "vr",
+                "vci",
+                "ri",
+                "ocr",
+                "k",
+                "mv",
+                "ies"
+            ]
+        },
+        "nn_model": {
+            "model": "LstmModel",
+            "dropout": 0.5,
+            "hidden_size": 256,
+            "learning_rate": 1.0,
+            "lr_scheduler": "StepLR",
+            "lr_scheduler_params": {
+                "step_size": 10,
+                "gamma": 0.5
+            },
+            "dynamic_vars": [],
+            "static_vars": [
+                "layer_count",
+                "layer_thickness",
+                "vr",
+                "vci",
+                "ri",
+                "ocr",
+                "k",
+                "mv",
+                "ies"
+            ]
+        }
+    },
+    "observations": {
+        "name": "ls_aggregate",
+        "train_path": "/projects/mhpi/leoglonz/data/extracted/land_subsidence/ls_train",
+        "test_path": "/projects/mhpi/leoglonz/data/extracted/land_subsidence/ls_test",
+        "start_time": "2006/01/01",
+        "end_time": "2024/12/31",
+        "dynamic_vars": [
+            "drawdown"
+        ],
+        "static_vars": [
+            "layer_count",
+            "layer1_thickness",
+            "layer2_thickness",
+            "layer3_thickness",
+            "layer4_thickness",
+            "layer5_thickness",
+            "soil_class"
+        ]
+    },
+    "dtype": "torch.float32",
+    "train_time": [
+        "1999/10/01",
+        "2008/09/30"
+    ],
+    "test_time": [
+        "1989/10/01",
+        "1999/09/30"
+    ],
+    "predict_time": [
+        "1989/10/01",
+        "1999/09/30"
+    ],
+    "experiment_time": [
+        "1989/10/01",
+        "2008/09/30"
+    ],
+    "all_time": [
+        "2006/01/01",
+        "2024/12/31"
+    ],
+    "model_path": "../output/ls_aggregate/train1999-2008/LstmModel_E51_B200_H256_LB2_n1_111111/Terzaghi/NseBatchLoss/1dyn/parIES",
+    "out_path": "../output/ls_aggregate/train1999-2008/LstmModel_E51_B200_H256_LB2_n1_111111/Terzaghi/NseBatchLoss/1dyn/parIES/test1989-1999_Ep1"
+}

@@ -15,7 +15,7 @@ data_loader: LsLoader
 data_sampler: LsSampler
 trainer: LsTrainer
 
-save_path: ../../results/ls
+save_path: ../output/
 trained_model: ''
 
 
@@ -60,16 +60,20 @@ dpl_model:
         nmul: 1
         dy_drop: 0.0
         lookback: 2
+        layer_count: 9
+        learnable_layers: [0, 1]
+        learnable_params: [
+            parLT,  # Layer thickness  <-- start w/ this
+            # parVR,  # Void Ratio
+            # parVCI,  # Virgin Compression Index  <-- start w/ this
+            # parRC,  # Recompression Index
+            # parOCR,  # Overconsolidation Ratio
+            # parK,  # Percent coarseness
+            # parMv,  # Coefficient of volume compressibility
+            # parIES,  # Initial effective stress  <-- start w/ this
+        ]
         dynamic_params:
             Terzaghi: [
-                # parLT,  # Layer thickness  <-- start w/ this
-                # parVR,  # Void Ratio
-                # parVCI,  # Virgin Compression Index  <-- start w/ this
-                # parRC,  # Recompression Index
-                # parOCR,  # Overconsolidation Ratio
-                # parK,  # Percent coarseness
-                # parMv,  # Coefficient of volume compressibility
-                parIES,  # Initial effective stress  <-- start w/ this
             ]
 
         nearzero: 1e-5
@@ -91,7 +95,7 @@ dpl_model:
 
 
     nn_model:
-        model: CudnnLstmModel
+        model: LstmModel #CudnnLstmModel
         dropout: 0.5
         hidden_size: 256
         learning_rate: 1.0
@@ -101,7 +105,7 @@ dpl_model:
             gamma: 0.5
         
         dynamic_vars: [
-            drawdown,
+            # drawdown,
         ]
         static_vars: [
             layer_count,
