@@ -46,8 +46,7 @@
             "lookback": 2,
             "layer_count": 9,
             "learnable_layers": [
-                0,
-                1
+                0
             ],
             "learnable_params": [
                 "parLT"

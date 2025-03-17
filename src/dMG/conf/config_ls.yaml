@@ -61,7 +61,7 @@ dpl_model:
         dy_drop: 0.0
         lookback: 2
         layer_count: 9
-        learnable_layers: [0, 1]
+        learnable_layers: [0]
         learnable_params: [
             parLT,  # Layer thickness  <-- start w/ this
             # parVR,  # Void Ratio

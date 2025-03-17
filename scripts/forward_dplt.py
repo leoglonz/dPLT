@@ -30,6 +30,11 @@ with open(config['observations']['train_path'], 'rb') as f:
     data_dict = pickle.load(f)
 
 
+# only keep desired layers
+layer_count = config['dpl_model']['phy_model']['layer_count']
+data_dict['attributes'] = data_dict['attributes'][:, :layer_count, :]
+
+
 # Normalize attributes for NN:
 attrs = data_dict['attributes']
 for i in range(attrs.shape[-1]):
@@ -37,12 +42,13 @@ for i in range(attrs.shape[-1]):
         / attrs[:, :, i].std()
     
 data_dict['xc_nn_norm'] = attrs
+data_dict['x_phy'] = data_dict['forcing']
 
 
 # Train-test split + convert to torch tensors
 train_dataset = {}
 test_dataset = {}
-split = int(len(data_dict['forcing']) * (1 - TEST_SPLIT))
+split = int(len(data_dict['x_phy']) * (1 - TEST_SPLIT))
 
 for key in data_dict.keys():
     train_dataset[key] = torch.tensor(
