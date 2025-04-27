@@ -1,4 +1,4 @@
-from typing import Optional, Tuple
+from typing import Optional
 
 import torch
 
@@ -12,25 +12,25 @@ class LstmMlpModel(torch.nn.Module):
     
     Supports GPU and CPU forwarding.
     
-    Paramters
-    ---------
-    nx1 : int
+    Parameters
+    ----------
+    nx1
         Number of LSTM input features.
-    ny1 : int
+    ny1
         Number of LSTM output features.
-    hiddeninv1 : int
+    hiddeninv1
         LSTM hidden size.
-    nx2 : int
+    nx2
         Number of MLP input features.
-    ny2 : int
+    ny2
         Number of MLP output features.
-    hiddeninv2 : int
+    hiddeninv2
         MLP hidden size.
-    dr1 : float, optional
+    dr1
         Dropout rate for LSTM. Default is 0.5.
-    dr2 : float, optional
+    dr2
         Dropout rate for MLP. Default is 0.5.
-    device : str, optional
+    device
         Device to run the model on. Default is 'cpu'.
     """
     def __init__(
@@ -48,7 +48,7 @@ class LstmMlpModel(torch.nn.Module):
     ) -> None:
         super().__init__()
         self.name = 'LstmMlpModel'
-        
+
         if device == 'cpu':
             # CPU-compatible LSTM model.
             self.lstminv = LstmModel(
@@ -59,7 +59,7 @@ class LstmMlpModel(torch.nn.Module):
             self.lstminv = CudnnLstmModel(
                 nx=nx1, ny=ny1, hidden_size=hiddeninv1, dr=dr1
             )
-        
+
         self.ann = AnnModel(
             nx=nx2, ny=ny2, hidden_size=hiddeninv2, dr=dr2
         )
@@ -68,14 +68,14 @@ class LstmMlpModel(torch.nn.Module):
         self,
         z1: torch.Tensor,
         z2: torch.Tensor
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         """Forward pass.
 
         Parameters
         ----------
-        z1 : torch.Tensor
-            The LSTM input tensor. 
-        z2 : torch.Tensor
+        z1
+            The LSTM input tensor.
+        z2
             The MLP input tensor.
         
         Returns

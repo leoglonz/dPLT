@@ -1,8 +1,17 @@
+from typing import Any
+
 import torch
 import torch.nn as nn
 
 
 class MlpModel(nn.Module):
+    """Multi-layer perceptron (MLP) model.
+    
+    Parameters
+    ----------
+    config
+        Configuration dictionary with model settings.
+    """
     def __init__(self, config):
         super().__init__()
         self.name = 'MlpModel'
@@ -31,7 +40,19 @@ class MlpModel(nn.Module):
         self.activation_sigmoid = torch.nn.Sigmoid()
         self.activation_tanh = torch.nn.Tanh()
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass.
+        
+        Parameters
+        ----------
+        x
+            Input tensor.
+        
+        Returns
+        -------
+        out
+            Output tensor.
+        """
         # out = self.seq_lin_layers(x)
         out = self.L1(x)
         out = self.L2(out)
@@ -43,7 +64,18 @@ class MlpModel(nn.Module):
 
 
 class MlpMulModel(nn.Module):
-    def __init__(self, config, nx, ny):
+    """Multi-layer perceptron (MLP) model with multiple layers.
+    
+    Parameters
+    ----------
+    config
+        Configuration dictionary with model settings.
+    nx
+        Number of input features.
+    ny
+        Number of output features.
+    """
+    def __init__(self, config: dict[str, Any], nx: int, ny: int) -> None:
         super().__init__()
         self.name = 'MlpMulModel'
         self.config = config
@@ -61,7 +93,19 @@ class MlpMulModel(nn.Module):
         self.activation_sigmoid = torch.nn.Sigmoid()
         self.activation_tanh = torch.nn.Tanh()
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass.
+        
+        Parameters
+        ----------
+        x
+            Input tensor.
+        
+        Returns
+        -------
+        out
+            Output tensor.
+        """
         # out = self.seq_lin_layers(x)
         out = self.L1(x)
         out = self.L2(out)

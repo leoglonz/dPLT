@@ -1,7 +1,7 @@
-from typing import Any, Dict, Optional, Tuple, Union, List
+from typing import Any, Dict, List, Optional, Tuple, Union
 
-import torch
 import pandas as pd
+import torch
 
 
 class TerzaghiMultiLayer(torch.nn.Module):

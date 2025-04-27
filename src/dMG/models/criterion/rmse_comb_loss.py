@@ -1,9 +1,11 @@
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 import torch
 
+from dMG.models.criterion.base import BaseCriterion
 
-class RmseCombLoss(torch.nn.Module):
+
+class RmseCombLoss(BaseCriterion):
     """Combination root mean squared error (RMSE) loss function.
 
     This loss combines the RMSE of the target variable with the RMSE of
@@ -21,76 +23,68 @@ class RmseCombLoss(torch.nn.Module):
 
     Parameters
     ----------
-    target : torch.Tensor
-        The target data array.
-    config : dict
-        The configuration dictionary.
-    device : str, optional
-        The device to use for the loss function object. The default is 'cpu'.
-    
-    Optional Parameters: (Set in config)
-    --------------------
-    alpha : float
-        Weighting factor for the log-sqrt RMSE. The default is 0.25.
-    beta : float
-        Stability term to prevent division by zero. The default is 1e-6.
+    config
+        Configuration dictionary.
+    device
+        The device to run loss function on.
+    **kwargs
+        Additional arguments.
+
+        - alpha: Weighting factor for the log-sqrt RMSE. Default is 0.25.
+
+        - beta: Stability term to prevent division by zero. Default is 1e-6.
     """
     def __init__(
         self,
-        target: torch.Tensor,
-        config: Dict[str, Any],
+        config: dict[str, Any],
         device: Optional[str] = 'cpu',
+        **kwargs: float,
     ) -> None:
-        super().__init__()
+        super().__init__(config, device)
         self.name = 'Combination RMSE Loss'
         self.config = config
         self.device = device
 
-        # Weights of log-sqrt RMSE
-        self.alpha = config.get('alpha', 0.25)
-        self.beta = config.get('beta', 1e-6)
+        self.alpha = kwargs.get('alpha', config.get('alpha', 0.25))
+        self.beta = kwargs.get('beta', config.get('beta', 1e-6))
 
     def forward(
         self,
         y_pred: torch.Tensor,
         y_obs: torch.Tensor,
-        n_samples: torch.Tensor,
+        **kwargs: Any,
     ) -> torch.Tensor:
         """Compute loss.
         
         Parameters
         ----------
-        y_pred : torch.Tensor
-            The predicted values.
-        y_obs : torch.Tensor
-            The observed values.
-        n_samples : torch.Tensor
-            The number of samples in each batch.
+        y_pred
+            Tensor of predicted target data.
+        y_obs
+            Tensor of target observation data.
+        **kwargs
+            Additional arguments for interface compatibility, not used.
 
         Returns
         -------
         torch.Tensor
             The combined loss.
         """
-        prediction = y_pred.squeeze()
-        target = y_obs[:, :, 0]
+        prediction, target = self._format(y_pred, y_obs)
 
         if len(target) > 0:
-            # Mask where observations are valid (not NaN).            
-            mask1 = ~torch.isnan(target)
-            p_sub = prediction[mask1]
-            t_sub = target[mask1]
-            
+            # Mask where observations are valid (not NaN).
+            mask = ~torch.isnan(target)
+            p_sub = prediction[mask]
+            t_sub = target[mask]
+
             # RMSE
-            p_sub1 = torch.log10(torch.sqrt(prediction + self.beta) + 0.1)
-            t_sub1 = torch.log10(torch.sqrt(target + self.beta) + 0.1)
-            loss1 = torch.sqrt(((p_sub - t_sub) ** 2).mean())  # RMSE item
+            loss1 = torch.sqrt(((p_sub - t_sub) ** 2).mean())
 
             # Log-Sqrt RMSE
-            mask2 = ~torch.isnan(t_sub1)
-            p_sub2 = p_sub1[mask2]
-            t_sub2 = t_sub1[mask2]
-            loss2 = torch.sqrt(((p_sub2 - t_sub2) ** 2).mean())
+            p_sub1 = torch.log10(torch.sqrt(p_sub + self.beta) + 0.1)
+            t_sub1 = torch.log10(torch.sqrt(t_sub + self.beta) + 0.1)
+            loss2 = torch.sqrt(((p_sub1 - t_sub1) ** 2).mean())
 
             # Combined losses
             loss = (1.0 - self.alpha) * loss1 + self.alpha * loss2

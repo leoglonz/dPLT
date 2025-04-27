@@ -1,13 +1,13 @@
 import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 import torch
 import tqdm
 
 from dMG.core.utils import save_model
 from dMG.models.criterion.range_bound_loss import RangeBoundLoss
-from dMG.models.differentiable_model import DeltaModel
+from dMG.models.deltamodel.dpl_model import DplModel
 from dMG.models.multimodels.ensemble_generator import EnsembleGenerator
 
 log = logging.getLogger(__name__)
@@ -27,16 +27,16 @@ class ModelHandler(torch.nn.Module):
 
     Parameters
     ----------
-    config : dict
+    config
         Configuration settings for the model.
-    device : str, optional
-        Device to run the model on. Default is None.
-    verbose : bool, optional
-        Whether to print verbose output. Default is False.
+    device
+        Device to run the model on.
+    verbose
+        Whether to print verbose output.
     """
     def __init__(
         self,
-        config: Dict[str, Any],
+        config: dict[str, Any],
         device: Optional[str] = None,
         verbose=False,
     ) -> None:
@@ -50,14 +50,14 @@ class ModelHandler(torch.nn.Module):
             self.device = config['device']
         else:
             self.device = device
-        
+
         self.multimodel_type = config['multimodel_type']
         self.model_dict = {}
         self.models = self.list_models()
         self._init_models()
 
         self.loss_func = None
-        self.loss_dict = {key: 0 for key in self.models}
+        self.loss_dict = dict.fromkeys(self.models, 0)
         self.target_name = config['train']['target'][0]
 
         if self.multimodel_type in ['nn_parallel']:
@@ -67,22 +67,28 @@ class ModelHandler(torch.nn.Module):
             self.range_bound_loss = RangeBoundLoss(config, device=self.device)
         self.is_ensemble = False
 
-    def list_models(self) -> List[str]:
-        """List of models specified in the configuration."""
-        models = self.config['dpl_model']['phy_model']['model']
+    def list_models(self) -> list[str]:
+        """List of models specified in the configuration.
         
+        Returns
+        -------
+        list[str]
+            List of model names.
+        """
+        models = self.config['dpl_model']['phy_model']['model']
+
         if self.multimodel_type in ['nn_parallel']:
             # Add ensemble weighting NN to the list.
             models.append('wNN')
         return models
-    
+
     def _init_models(self) -> None:
         """Initialize and store models, multimodels, and checkpoints."""
         if (self.multimodel_type is None) and (len(self.models) > 1):
             raise ValueError(
                 "Multiple models specified, but ensemble type is 'none'. Check configuration."
             )
-        
+
         # Epoch to load
         if self.config['mode'] == 'train':
             load_epoch = self.config['train']['start_epoch']
@@ -90,7 +96,7 @@ class ModelHandler(torch.nn.Module):
             load_epoch = self.config['test']['test_epoch']
         else:
             load_epoch = self.config.get('load_epoch', 0)
-        
+
         # Load models
         try:
             self.load_model(load_epoch)
@@ -102,8 +108,8 @@ class ModelHandler(torch.nn.Module):
         
         Parameters
         ----------
-        epoch : int 
-            Epoch to load the model from. Default is 0.
+        epoch
+            Epoch to load the model from.
         """
         for name in self.models:
             # Created new model
@@ -115,8 +121,9 @@ class ModelHandler(torch.nn.Module):
                     device=self.device
                 )
             else:
-                # Differentiable model
-                self.model_dict[name] = DeltaModel(
+                # Differentiable model (dPL modality)
+                # TODO: make dynamic import for other modalities.
+                self.model_dict[name] = DplModel(
                     phy_model_name=name,
                     config=self.config['dpl_model'],
                     device=self.device
@@ -126,10 +133,12 @@ class ModelHandler(torch.nn.Module):
                 # Leave model uninitialized for training.
                 if self.verbose:
                     log.info(f"Created new model: {name}")
-                continue 
+                continue
             else:
                 # Initialize model from checkpoint state dict.
-                path = os.path.join(self.model_path, f"d{name}_Ep{epoch}.pt")
+                path = self.model_path
+                if f"d{name}_Ep" not in path:
+                    path = os.path.join(path, f"d{name}_Ep{epoch}.pt")
                 if not os.path.exists(path):
                     raise FileNotFoundError(
                         f"{path} not found for model {name}."
@@ -151,7 +160,7 @@ class ModelHandler(torch.nn.Module):
                         )
                     )
                     self.model_dict[name].to(self.device)
-                
+
                     # Overwrite internal config if there is discontinuity:
                     if self.model_dict[name].config:
                         self.model_dict[name].config = self.config
@@ -159,35 +168,41 @@ class ModelHandler(torch.nn.Module):
                 if self.verbose:
                     log.info(f"Loaded model: {name}, Ep {epoch}")
 
-    def get_parameters(self) -> List[torch.Tensor]:
-        """Return all model parameters."""
+    def get_parameters(self) -> list[torch.Tensor]:
+        """Return all model parameters.
+        
+        Returns
+        -------
+        list[torch.Tensor]
+            List of model parameters.
+        """
         self.parameters = []
         for model in self.model_dict.values():
             # Differentiable model parameters
             self.parameters += list(model.parameters())
-        
+
         if self.multimodel_type in ['nn_parallel']:
             # Ensemble weighting NN parameters if trained in parallel.
             self.parameters += list(self.ensemble_generator.parameters())
         return self.parameters
-        
+
     def forward(
         self,
-        dataset_dict: Dict[str, torch.Tensor],
+        dataset_dict: dict[str, torch.Tensor],
         eval: bool = False
-    ) -> Dict[str, torch.Tensor]:        
+    ) -> dict[str, torch.Tensor]:
         """
-        Sequentially forward for one or more differentiable models with an 
+        Sequentially forward for one or more differentiable models with an
         optional weighting NN for multimodel ensembles trained in parallel or
         series (differentiable model parameterization NNs frozen).
 
         Parameters
         ----------
-        dataset_dict : dict
+        dataset_dict
             Dictionary containing input data.
-        eval : bool, optional
+        eval
             Whether to run the model in evaluation mode with gradients
-            disabled. Default is False.
+            disabled.
         
         Returns
         -------
@@ -211,10 +226,10 @@ class ModelHandler(torch.nn.Module):
             return {list(self.model_dict.keys())[0]: self.ensemble_output_dict}
         else:
             return self.output_dict
-    
+
     def _forward_multimodel(
         self,
-        dataset_dict: Dict[str, torch.Tensor],
+        dataset_dict: dict[str, torch.Tensor],
         eval: bool = False
     ) -> None:
         """
@@ -223,11 +238,11 @@ class ModelHandler(torch.nn.Module):
 
         Parameters
         ----------
-        dataset_dict : dict
+        dataset_dict
             Dictionary containing input data.
-        eval: bool, optional
+        eval
             Whether to run the model in evaluation mode with gradients
-            disabled. Default is False.
+            disabled.
         """
         if eval:
             ## Inference mode
@@ -248,24 +263,24 @@ class ModelHandler(torch.nn.Module):
 
     def calc_loss(
         self,
-        dataset: Dict[str, torch.Tensor],
+        dataset_dict: dict[str, torch.Tensor],
         loss_func: Optional[torch.nn.Module] = None,
     ) -> torch.Tensor:
         """Calculate combined loss across all models.
-        
-        TODO: Add support for different loss functions for each model.
-    
+            
         Parameters
         ----------
-        dataset : dict
-            Dataset dictionary containing observation data.
-        loss_func : nn.Module, optional
-            Loss function to use. Default is None.
+        dataset_dict
+            Dictionary containing input data.
+        loss_func
+            Loss function to use.
 
         Returns
         -------
         torch.Tensor
             Combined loss across all models.
+
+        TODO: Support different loss functions for each model in ensemble.
         """
         if not self.loss_func and not loss_func:
             raise ValueError("No loss function defined.")
@@ -280,22 +295,22 @@ class ModelHandler(torch.nn.Module):
             output = output[self.target_name]
 
             loss = loss_func(
-                output,
-                dataset['target'],
-                n_samples=dataset['batch_sample'],
+                output.squeeze(),
+                dataset_dict['target'].squeeze(),
+                sample_ids=dataset_dict['batch_sample'],
             )
             loss_combined += loss
             self.loss_dict[name] += loss.item()
-        
+
         # Add ensemble loss if applicable (wNN trained in parallel)
         if self.multimodel_type in ['nn_parallel']:
-            loss_combined += self.calc_loss_multimodel(dataset, loss_func)
+            loss_combined += self.calc_loss_multimodel(dataset_dict, loss_func)
 
         return loss_combined
 
     def calc_loss_multimodel(
         self,
-        dataset: Dict[str, torch.Tensor],
+        dataset_dict: dict[str, torch.Tensor],
         loss_func: torch.nn.Module,
     ) -> torch.Tensor:
         """
@@ -307,9 +322,9 @@ class ModelHandler(torch.nn.Module):
 
         Parameters
         ----------
-        dataset : dict
-            Dataset dictionary containing observation data.
-        loss_func : nn.Module
+        dataset_dict
+            Dictionary containing input data.
+        loss_func
             Loss function to use.
         
         Returns
@@ -320,7 +335,7 @@ class ModelHandler(torch.nn.Module):
         if not self.loss_func_wnn and not loss_func:
             raise ValueError("No loss function defined.")
         self.loss_func_wnn = loss_func or self.loss_func_wnn
-        
+
         # Sum of weights for each model
         weights_sum = torch.sum(
             torch.stack(
@@ -342,9 +357,9 @@ class ModelHandler(torch.nn.Module):
 
         # Ensemble predictions loss
         ensemble_loss = self.loss_func_wnn(
-            output,
-            dataset['target'],
-            n_samples=dataset['batch_sample']
+            output.squeeze(),
+            dataset_dict['target'][:, :, 0],
+            sample_ids=dataset_dict['batch_sample']
         )
 
         if self.verbose:
@@ -364,8 +379,8 @@ class ModelHandler(torch.nn.Module):
         
         Parameters
         ----------
-        epoch : int
-            Epoch number model will be saved at.
+        epoch
+            Epoch number to save model at.
         """
         for name, model in self.model_dict.items():
             save_model(self.config, model, name, epoch)
