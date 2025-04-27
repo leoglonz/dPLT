@@ -1,19 +1,41 @@
-from dMG.core.utils import find_shared_keys
+from typing import Any
+
+import torch
+
+from dMG.core.utils.utils import find_shared_keys
 
 
-def model_average(model_preds_dict, config):
+def model_average(
+    model_preds_dict: dict[str, torch.Tensor],
+    config: dict[str, Any],
+) -> dict[str, Any]:
     """
-    For any number of metrics specified in the input dictionary, calculate composite predictions as the average of multiple models' outputs at each basin for each day.
+    For any number of metrics specified in the input dictionary, calculate
+    composite predictions as the average of multiple models' outputs at each
+    basin for each day.
 
-    Returns: predictions dict with attributes
-        'flow_sim', 'srflow', 'ssflow', 'gwflow', 'AET_hydro', 'PET_hydro', 'flow_sim_no_rout', 'srflow_no_rout', 'ssflow_no_rout', 'gwflow_no_rout', 'BFI_sim'
+    Parameters
+    ----------
+    model_preds_dict
+        Dictionary of model predictions
+
+    config
+        Dictionary of model configuration.
+        
+    Returns
+    -------
+    dict[str, Any]
+        predictions dict with attributes
+        'flow_sim', 'srflow', 'ssflow', 'gwflow', 'AET_hydro', 'PET_hydro',
+        'flow_sim_no_rout', 'srflow_no_rout', 'ssflow_no_rout', 'gwflow_no_rout',
+        'BFI_sim'
     """
-    ensemble_pred = dict()
+    ensemble_pred = {}
 
     # Get prediction shared between all models.
     mod_dicts = [model_preds_dict[mod] for mod in config['hydro_models']]
     shared_keys = find_shared_keys(*mod_dicts)
-    
+
      # TODO: identify why 'flow_sim_no_rout' calculation returns shape [365,1]
     # vs [365, 100] which breaks the ensemble loop at point of matrix mul below. (weights_dict[mod]
     # takes shape [365, 100].) Look at `QSIM` comprout vs no comprout in HBVmul.py. For now, remove it.
@@ -38,3 +60,4 @@ def model_average(model_preds_dict, config):
         ensemble_pred[key] = ensemble_pred[key] / len(config['hydro_models'])
 
     return ensemble_pred
+

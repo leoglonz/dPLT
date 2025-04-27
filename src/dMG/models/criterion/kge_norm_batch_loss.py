@@ -1,9 +1,11 @@
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 import torch
 
+from dMG.models.criterion.base import BaseCriterion
 
-class KgeNormBatchLoss(torch.nn.Module):
+
+class KgeNormBatchLoss(BaseCriterion):
     """Normalized Kling-Gupta efficiency (N-KGE) loss function.
 
     The N-KGE is calculated as:
@@ -17,58 +19,53 @@ class KgeNormBatchLoss(torch.nn.Module):
 
     Parameters
     ----------
-    target : torch.Tensor
-        The target data array.
-    config : dict
-        The configuration dictionary.
-    device : str, optional
-        The device to use for the loss function object. The default is 'cpu'.
+    config
+        Configuration dictionary.
+    device
+        The device to run loss function on.
+    **kwargs
+        Additional arguments.
 
-    Optional Parameters: (Set in config)
-    --------------------
-    eps : float
-        Stability term to prevent division by zero. The default is 0.1. 
+        - eps: Stability term to prevent division by zero. Default is 0.1.
     """
     def __init__(
         self,
-        target: torch.Tensor,
-        config: Dict[str, Any],
+        config: dict[str, Any],
         device: Optional[str] = 'cpu',
+        **kwargs: int,
     ) -> None:
-        super().__init__()
+        super().__init__(config, device)
         self.name = 'Batch NKGE Loss'
         self.config = config
         self.device = device
 
-        # Stability term
-        self.eps = config.get('eps', 0.1)
+        self.eps = kwargs.get('eps', config.get('eps', 0.1))
 
     def forward(
         self,
         y_pred: torch.Tensor,
-        y_obs: Optional[torch.Tensor] = None,
-        n_samples: Optional[torch.Tensor] = None,
+        y_obs: torch.Tensor,
+        **kwargs: Any,
     ) -> torch.Tensor:
         """Compute loss.
 
         Parameters
         ----------
-        y_pred : torch.Tensor
-            The predicted values.
-        y_obs : torch.Tensor, optional
-            The observed values. The default is None.
-        n_samples : torch.Tensor, optional
-            The number of samples in each batch. The default is None.
+        y_pred
+            Tensor of predicted target data.
+        y_obs
+            Tensor of target observation data.
+        **kwargs
+            Additional arguments for interface compatibility, not used.
         
         Returns
         -------
         torch.Tensor
             The loss value.
         """
-        prediction = y_pred.squeeze()
-        target = y_obs[:, :, 0]
+        prediction, target = self._format(y_pred, y_obs)
 
-        # Mask where observations are valid (not NaN).            
+        # Mask where observations are valid (not NaN).
         mask = ~torch.isnan(target)
         p_sub = prediction[mask]
         t_sub = target[mask]

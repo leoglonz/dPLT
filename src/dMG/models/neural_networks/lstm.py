@@ -1,5 +1,5 @@
 import math
-from typing import Optional, Tuple
+from typing import Optional
 
 import torch
 import torch.nn.functional as F
@@ -14,16 +14,16 @@ class Lstm(torch.nn.Module):
     This replaces the HydroDL `CudnnLstm`, which uses CPU-incompatible
     torch cudnn_rnn backends.
 
-    NOTE: Not validated for training.
-
     Parameters
     ----------
-    nx : int
+    nx
         Number of input features.
-    hidden_size : int
+    hidden_size
         Number of hidden units.
-    dr : float, optional
+    dr
         Dropout rate. Default is 0.5.
+
+    NOTE: Not validated for training.
     """
     def __init__(
         self,
@@ -60,11 +60,12 @@ class Lstm(torch.nn.Module):
         self.b_ih = Parameter(torch.Tensor(hidden_size * 4))
         self.b_hh = Parameter(torch.Tensor(hidden_size * 4))
         self._all_weights = [['w_ih', 'w_hh', 'b_ih', 'b_hh']]
-        
+
         self.reset_mask()
         self.reset_parameters()
 
     def __setstate__(self, d: dict) -> None:
+        """Set state of LSTM."""
         super().__setstate__(d)
         self.__dict__.setdefault('_data_ptrs', [])
         if 'all_weights' in d:
@@ -74,11 +75,13 @@ class Lstm(torch.nn.Module):
         self._all_weights = [['w_ih', 'w_hh', 'b_ih', 'b_hh']]
 
     def reset_mask(self):
+        """Reset dropout mask."""
         with torch.no_grad():
             self.mask_w_ih = createMask(self.w_ih, self.dr)
             self.mask_w_hh = createMask(self.w_hh, self.dr)
 
     def reset_parameters(self):
+        """Initialize parameters."""
         stdv = 1.0 / math.sqrt(self.hidden_size)
         for param in self.parameters():
             if param.requires_grad:
@@ -91,21 +94,21 @@ class Lstm(torch.nn.Module):
         cx: Optional[torch.Tensor] = None,
         do_drop_mc: bool = False,
         dr_false: bool = False,
-    ) -> Tuple[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
+    ) -> tuple[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
         """Forward pass.
         
         Parameters
         ----------
-        input : torch.Tensor
+        input
             The input tensor.
-        hx : torch.Tensor, optional
-            Hidden state tensor. Default is None.
-        cx : torch.Tensor, optional
-            Cell state tensor. Default is None.
-        do_drop_mc : bool, optional
-            Flag for applying dropout. Default is False.
-        dr_false : bool, optional
-            Flag for applying dropout. Default is False.
+        hx
+            Hidden state tensor.
+        cx
+            Cell state tensor.
+        do_drop_mc
+            Flag for applying dropout.
+        dr_false
+            Flag for applying dropout.
         """
         # Ensure do_drop is False, unless do_drop_mc is True.
         if dr_false and (not do_drop_mc):
@@ -142,7 +145,7 @@ class Lstm(torch.nn.Module):
             ]
         else:
             weight = [self.w_ih, self.w_hh, self.b_ih, self.b_hh]
-        
+
         # Manually assign parameters to torch LSTM.
         self.lstm.weight_ih_l0 = torch.nn.Parameter(weight[0])
         self.lstm.weight_hh_l0 = torch.nn.Parameter(weight[1])
@@ -154,6 +157,7 @@ class Lstm(torch.nn.Module):
 
     @property
     def all_weights(self):
+        """Return all weights."""
         return [
             [getattr(self, weight) for weight in weights]
             for weights in self._all_weights
@@ -166,18 +170,18 @@ class LstmModel(torch.nn.Module):
     This replaces `CudnnLstmModel`, which uses torch cudnn_rnn backends with no
     CPU support.
 
-    NOTE: Not validated for training.
-
     Parameters
     ----------
-    nx : int
+    nx
         Number of input features.
-    ny : int
+    ny
         Number of output features.
-    hidden_size : int
+    hidden_size
         Number of hidden units.
-    dr : float, optional
-        Dropout rate. Default is 0.5.
+    dr
+        Dropout rate.
+
+    NOTE: Not validated for training.
     """
     def __init__(
         self,
@@ -207,7 +211,18 @@ class LstmModel(torch.nn.Module):
         do_drop_mc: Optional[bool] = False,
         dr_false: Optional[bool] = False,
     ) -> torch.Tensor:
-        x0 = F.relu(self.linear_in(x))        
+        """Forward pass.
+
+        Parameters
+        ----------
+        x
+            The input tensor.
+        do_drop_mc
+            Flag for applying dropout.
+        dr_false
+            Flag for applying dropout.
+        """
+        x0 = F.relu(self.linear_in(x))
         lstm_out, (hn, cn) = self.lstm(
             x0,
             do_drop_mc=do_drop_mc,

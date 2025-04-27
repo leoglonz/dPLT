@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Any, Dict
+from typing import Any
 
 import hydra
 import torch
@@ -11,7 +11,7 @@ from dMG.core.utils import initialize_config
 log = logging.getLogger(__name__)
 
 
-def load_config(path: str) -> Dict[str, Any]:
+def load_config(path: str) -> dict[str, Any]:
     """Parse and initialize configuration settings from yaml with Hydra.
     
     This loader is capable of handling config files in nonlinear directory
@@ -34,21 +34,21 @@ def load_config(path: str) -> Dict[str, Any]:
 
     with hydra.initialize(config_path=parent_path, version_base='1.3'):
         config = hydra.compose(config_name=config_name)
-   
+
     # Convert the OmegaConf object to a dict.
     config = OmegaConf.to_container(config, resolve=True)
-    
+
     # Convert date ranges / set device and dtype / create output dirs.
     config = initialize_config(config)
 
     return config
 
 
-def take_data_sample(config: Dict, dataset_dict: Dict[str, torch.Tensor], days=730,
-                     basins=100) -> Dict[str, torch.Tensor]:
+def take_data_sample(config: dict, dataset_dict: dict[str, torch.Tensor], days=730,
+                     basins=100) -> dict[str, torch.Tensor]:
     """Take sample of data."""
     dataset_sample = {}
-    
+
     for key, value in dataset_dict.items():
         if value.ndim == 3:
             # Determine warm-up period based on the key
@@ -56,19 +56,19 @@ def take_data_sample(config: Dict, dataset_dict: Dict[str, torch.Tensor], days=7
                 warm_up = 0
             else:
                 warm_up = config['dpl_model']['phy_model']['warm_up']
-            
+
             # Clone and detach the tensor to avoid the warning
             dataset_sample[key] = value[warm_up:days, :basins, :].clone().detach().to(
                 dtype=torch.float32, device=config['device'])
-        
+
         elif value.ndim == 2:
             # Clone and detach the tensor to avoid the warning
             dataset_sample[key] = value[:basins, :].clone().detach().to(
                 dtype=torch.float32, device=config['device'])
-        
+
         else:
             raise ValueError(f"Incorrect input dimensions. {key} array must have 2 or 3 dimensions.")
-    
+
     # Adjust the 'target' tensor based on the configuration
     if ('HBV1_1p' in config['dpl_model']['phy_model']['model'] and
         config['dpl_model']['phy_model']['use_warmup_mode'] and
@@ -77,5 +77,5 @@ def take_data_sample(config: Dict, dataset_dict: Dict[str, torch.Tensor], days=7
     else:
         warm_up = config['dpl_model']['phy_model']['warm_up']
         dataset_sample['target'] = dataset_sample['target'][warm_up:days, :basins]
-    
+
     return dataset_sample

@@ -1,18 +1,18 @@
 ### Load in data
-import sys
 import os
+import pickle
+import sys
+
 import numpy as np
 import torch
-import pickle
 
 sys.path.append('../../')
 sys.path.append('../../dMG')  # Add the dMG root directory.
 sys.path.append(os.path.abspath('..'))  # Add the parent directory of `scripts` to the path.
 
-from scripts import load_config
 from dMG import load_nn_model
+from scripts import load_config
 from src.dMG.models.phy_models.terzaghi import TerzaghiMultiLayer as dPLT
-
 
 #------------------------------------------#
 # Define model settings here.

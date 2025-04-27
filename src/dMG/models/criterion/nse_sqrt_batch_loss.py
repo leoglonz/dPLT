@@ -1,11 +1,13 @@
-from typing import Any, Dict, Optional
+from typing import Any, Optional, Union
 
 import numpy as np
 import torch
 
+from dMG.models.criterion.base import BaseCriterion
 
-class NseSqrtBatchLoss(torch.nn.Module):
-    """Sqrt normalized squared error (NSE) loss function.
+
+class NseSqrtBatchLoss(BaseCriterion):
+    """Square-root normalized squared error (NSE) loss function.
 
     Same as Fredrick 2019, batch NSE loss.
     Adapted from Yalan Song.
@@ -19,81 +21,89 @@ class NseSqrtBatchLoss(torch.nn.Module):
 
     Parameters
     ----------
-    target : torch.Tensor
-        The target data array.
-    config : dict
-        The configuration dictionary.
-    device : str, optional
-        The device to use for the loss function object. The default is 'cpu'.
+    config
+        Configuration dictionary.
+    device
+        The device to run loss function on.
+    **kwargs
+        Additional arguments.
 
-    Optional Parameters: (Set in config)
-    --------------------
-    eps : float
-        Stability term to prevent division by zero. The default is 0.1.
-    nearzero : float
-        Small value to perturb square root. The default is 1e-6.
+        - y_obs: Tensor of target observation data. (Required)
+
+        - eps: Stability term to prevent division by zero. Default is 0.1.
+
+        - beta: Stability term to prevent division by zero. Default is 1e-6.
     """
     def __init__(
         self,
-        target: torch.Tensor,
-        config: Dict[str, Any],
+        config: dict[str, Any],
         device: Optional[str] = 'cpu',
+        **kwargs: Union[torch.Tensor, float]
     ) -> None:
-        super().__init__()
+        super().__init__(config, device)
         self.name = 'Batch Sqrt NSE Loss'
         self.config = config
         self.device = device
-        self.std = np.nanstd(target[:, :, 0].cpu().detach().numpy(), axis=0)
-        
-        # Stability terms
-        self.eps = config.get('eps', 0.1)
-        self.nearzero = config.get('nearzero', 1e-6)
+
+        try:
+            y_obs = kwargs['y_obs']
+            self.std = np.nanstd(y_obs[:, :, 0].cpu().detach().numpy(), axis=0)
+        except KeyError as e:
+            raise KeyError("'y_obs' is not provided in kwargs") from e
+
+        self.eps = kwargs.get('eps', config.get('eps', 0.1))
+        self.beta = kwargs.get('beta', config.get('beta', 1e-6))
 
     def forward(
         self,
         y_pred: torch.Tensor,
         y_obs: torch.Tensor,
-        n_samples: torch.Tensor,
+        **kwargs: torch.Tensor,
     ) -> torch.Tensor:
         """Compute loss.
-        
+
         Parameters
         ----------
-        y_pred : torch.Tensor
-            The predicted values.
-        y_obs : torch.Tensor
-            The observed values.
-        n_samples : torch.Tensor
-            The number of samples in each batch.
+        y_pred
+            Tensor of predicted target data.
+        y_obs
+            Tensor of target observation data.
+        **kwargs
+            Additional arguments.
+
+            - sample_ids: indices of samples included in batch. (Required)
         
         Returns
         -------
         torch.Tensor
             The loss value.
         """
-        prediction = y_pred.squeeze()
-        target = y_obs[:, :, 0]
-        n_samples = n_samples.astype(int)
+        prediction, target = self._format(y_pred, y_obs)
+
+        try:
+            sample_ids = kwargs['sample_ids'].astype(int)
+        except KeyError as e:
+            raise KeyError("'sample_ids' is not provided in kwargs") from e
+
 
         if len(target) > 0:
             # Prepare grid-based standard deviations for normalization.
             n_timesteps = target.shape[0]
             std_batch = torch.tensor(
-                np.tile(self.std[n_samples].T, (n_timesteps, 1)),
+                np.tile(self.std[sample_ids].T, (n_timesteps, 1)),
                 dtype=torch.float32,
                 requires_grad=False,
                 device=self.device
             )
-            
+
             mask = ~torch.isnan(target)
             p_sub = prediction[mask]
             t_sub = target[mask]
             std_sub = std_batch[mask]
 
-            sq_res = torch.sqrt((p_sub - t_sub)**2 + self.nearzero)
+            sq_res = torch.sqrt((p_sub - t_sub)**2 + self.beta)
             norm_res = sq_res / (std_sub + self.eps)
             loss = torch.mean(norm_res)
         else:
             loss = torch.tensor(0.0, device=self.device)
         return loss
-    

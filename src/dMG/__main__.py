@@ -1,7 +1,4 @@
-"""Main script for running differentiable model experiments."""
 import logging
-import os
-import sys
 import time
 
 import hydra
@@ -29,19 +26,20 @@ def run_mode(mode: str, trainer):
         trainer.inference()
     else:
         raise ValueError(f"Invalid mode: {mode}")
-    
+
 
 @hydra.main(
     version_base='1.3',
     config_path='conf/',
-    config_name='config_ls',
+    config_name='config',
 )
 def main(config: DictConfig) -> None:
+    """Main function to run differentiable model experiments."""
     try:
         start_time = time.perf_counter()
 
         ### Initializations ###
-        config = initialize_config(config)
+        config = initialize_config(config, write_path=True)
         set_randomseed(config['random_seed'])
 
         log.info(f"Running mode: {config['mode']}")
@@ -62,29 +60,29 @@ def main(config: DictConfig) -> None:
             model,
             train_dataset=data_loader.train_dataset,
             eval_dataset=data_loader.eval_dataset,
-            inf_dataset=data_loader.dataset,
+            dataset=data_loader.dataset,
             verbose=True,
         )
 
         ### Run mode ###
         run_mode(config['mode'], trainer)
-        
+
     except KeyboardInterrupt:
         log.warning("|> Keyboard interrupt received. Exiting gracefully <|")
 
-    except Exception as e:
+    except Exception:
         log.error("|> An error occurred <|", exc_info=True)  # Logs full traceback
-    
+
     finally:
         log.info("Cleaning up resources...")
         torch.cuda.synchronize()
         torch.cuda.empty_cache()
-    
+
         total_time = time.perf_counter() - start_time
         log.info(
             f"| {config['mode']} completed | "
             f"Time Elapsed: {(total_time / 60):.6f} minutes"
-        ) 
+        )
 
 
 if __name__ == '__main__':

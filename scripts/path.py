@@ -1,7 +1,7 @@
 import hashlib
 import json
 import os
-from typing import Any, Dict
+from typing import Any, dict
 
 import torch
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -23,7 +23,7 @@ class PathBuilder(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     model_config['protected_namespaces'] = ()
 
-    config: Dict[str, Any] = Field(..., description="Experiment configuration dictionary")
+    config: dict[str, Any] = Field(..., description="Experiment configuration dictionary")
     base_path: str = ''
     dataset_name: str = ''
     phy_model_inputs: str = ''
@@ -35,7 +35,7 @@ class PathBuilder(BaseModel):
     loss_function: str = ''
     hyperparameter_detail: str = ''
 
-    def __init__(self, config: Dict[str, Any]) -> None:
+    def __init__(self, config: dict[str, Any]) -> None:
         super().__init__(config=config)
 
     def model_post_init(self, __context: Any) -> Any:
@@ -61,7 +61,7 @@ class PathBuilder(BaseModel):
         return super().model_post_init(__context)
     
     @field_validator('config')
-    def validate_config(cls, value) -> Dict[str, Any]:
+    def validate_config(cls, value) -> dict[str, Any]:
         """Validate the configuration dictionary."""
         required_keys = ['save_path', 'train', 'test', 'dpl_model']
         for key in required_keys:
@@ -82,7 +82,7 @@ class PathBuilder(BaseModel):
             self.dynamic_parameters,
         )
 
-    def build_path_out(self, model_path: str = None) -> Dict[str, Any]:
+    def build_path_out(self, model_path: str = None) -> dict[str, Any]:
         """Build path to model outputs from individual root paths.
         
         Parameters
@@ -106,7 +106,7 @@ class PathBuilder(BaseModel):
                 self.test_period,
             )
 
-    def write_path (self, config: Dict[str, Any]) -> dict:
+    def write_path (self, config: dict[str, Any]) -> dict:
         """Create directory where model and outputs will be saved.
 
         Creates all root directories to support the target directory.
@@ -165,7 +165,7 @@ class PathBuilder(BaseModel):
             return obj  # Return as is for natively serializable types
         
     @staticmethod
-    def save_config(path: str, config: Dict[str, Any]) -> None:
+    def save_config(path: str, config: dict[str, Any]) -> None:
         """Save the configuration metadata to the output directory.
         
         Overwrite if it already exists.
@@ -189,15 +189,15 @@ class PathBuilder(BaseModel):
             try:
                 os.makedirs(base_path)
             except Exception as e:
-                raise ValueError(f"Error creating base save path from config: {e}")
+                raise ValueError(f"Error creating base save path from config: {e}") from e
     
     @staticmethod
-    def _dataset_name(config: Dict[str, Any]) -> str:
+    def _dataset_name(config: dict[str, Any]) -> str:
         """Name of the dataset used."""
         return f"{config['observations']['name']}"
 
     @staticmethod
-    def _phy_model_inputs(config: Dict[str, Any]) -> str:
+    def _phy_model_inputs(config: dict[str, Any]) -> str:
         """Number of physical model input variables.
         
         TODO: needs more thought (e.g. what is same count, different inputs?)
@@ -209,10 +209,10 @@ class PathBuilder(BaseModel):
         return f"{config['dpl_model']['phy_model']['dynamic_vars']}dy_{static_vars}st_in"
     
     @staticmethod
-    def _train_period(config: Dict[str, Any], abbreviate: bool = False) -> str:
+    def _train_period(config: dict[str, Any], abbreviate: bool = False) -> str:
         """Training period for an experiment.
 
-        Format is 
+        Format is
             'trainYYYY-YYYY' or 'trainYY-YY' if abbreviated.
         """
         start = config['train']['start_time'][:4]
@@ -220,11 +220,11 @@ class PathBuilder(BaseModel):
 
         if abbreviate:
             return f"train{start[-2:]}-{end[-2:]}"
-        else: 
+        else:
             return f"train{start}-{end}"
 
     @staticmethod
-    def _test_period(config: Dict[str, Any], abbreviate: bool = False) -> str:
+    def _test_period(config: dict[str, Any], abbreviate: bool = False) -> str:
         """Testing period for an experiment.
 
         Format is
@@ -241,17 +241,17 @@ class PathBuilder(BaseModel):
 
         if abbreviate:
             return f"test{start[-2:]}-{end[-2:]}" + test_epoch
-        else: 
+        else:
             return f"test{start}-{end}" + test_epoch
 
     @staticmethod
-    def _model_names(config: Dict[str, Any]) -> str:
+    def _model_names(config: dict[str, Any]) -> str:
         """Names of the models used in an experiment."""
         models = config['dpl_model']['phy_model']['model']
         return '_'.join(models)
 
     @staticmethod
-    def _dynamic_parameters(config: Dict[str, Any], hash: bool = False) -> str:
+    def _dynamic_parameters(config: dict[str, Any], hash: bool = False) -> str:
         """Dynamic parameters used in the model(s).
         
         Parameters
@@ -260,7 +260,7 @@ class PathBuilder(BaseModel):
             If True, returns a short hash of the dynamic parameters.
 
         Format is
-            'p1_p2_q1_q2' etc. for model1 parameters p1, p2,... 
+            'p1_p2_q1_q2' etc. for model1 parameters p1, p2,...
             and model2 parameters q1, q2,...
 
             or
@@ -295,19 +295,18 @@ class PathBuilder(BaseModel):
             return f"{param_count}dyn"
 
     @staticmethod
-    def _loss_function(config: Dict[str, Any]) -> str:
+    def _loss_function(config: dict[str, Any]) -> str:
         """Loss function(s) used in the model(s)."""
         models = config['dpl_model']['phy_model']['model']
         loss_fn = config['loss_function']['model']
         loss_fn_str = '_'.join(
             loss_fn for model in models
-        )          
+        )
         return loss_fn_str
 
     @staticmethod
-    def _hyperparameter_details(config: Dict[str, Any]) -> str:
+    def _hyperparameter_details(config: dict[str, Any]) -> str:
         """Details of hyperparameters used in the model(s)."""
-
         # Set hiddensize for single or multi-NN setups.
         if config['dpl_model']['nn_model']['model'] == 'LstmMlpModel':
             hidden_size = f"{config['dpl_model']['nn_model']['lstm_hidden_size']}" \
