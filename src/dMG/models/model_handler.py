@@ -206,7 +206,7 @@ class ModelHandler(torch.nn.Module):
         
         Returns
         -------
-        Dict[str, torch.Tensor]
+        dict[str, torch.Tensor]
             Dictionary of model outputs. Each key corresponds to a model name.
         """
         self.output_dict = {}

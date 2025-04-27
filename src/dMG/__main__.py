@@ -1,6 +1,4 @@
 import logging
-import os
-import sys
 import time
 
 import hydra
@@ -33,7 +31,7 @@ def run_mode(mode: str, trainer):
 @hydra.main(
     version_base='1.3',
     config_path='conf/',
-    config_name='config_ls',
+    config_name='config',
 )
 def main(config: DictConfig) -> None:
     """Main function to run differentiable model experiments."""
@@ -72,7 +70,7 @@ def main(config: DictConfig) -> None:
     except KeyboardInterrupt:
         log.warning("|> Keyboard interrupt received. Exiting gracefully <|")
 
-    except Exception as e:
+    except Exception:
         log.error("|> An error occurred <|", exc_info=True)  # Logs full traceback
 
     finally:

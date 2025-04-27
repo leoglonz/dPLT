@@ -98,6 +98,7 @@ exclude = [
     ".vscode",
     "archive",
     "dev",
+    "scripts",
 ]
 lint.ignore = [
     # Do not perform function call in argument defaults

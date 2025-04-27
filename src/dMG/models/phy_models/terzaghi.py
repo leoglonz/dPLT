@@ -1,6 +1,5 @@
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Optional, Union
 
-import pandas as pd
 import torch
 
 
@@ -23,7 +22,7 @@ class TerzaghiMultiLayer(torch.nn.Module):
     """
     def __init__(
             self,
-            config: Optional[Dict[str, Any]] = None,
+            config: Optional[dict[str, Any]] = None,
             device: Optional[torch.device] = None,
         ) -> None:
         super().__init__()
@@ -82,7 +81,7 @@ class TerzaghiMultiLayer(torch.nn.Module):
             self,
             parameters: torch.Tensor,
             raw_parameters: torch.Tensor,
-        ) -> Dict[str, torch.Tensor]:
+        ) -> dict[str, torch.Tensor]:
         """Extract learned physical parameters from NN output and overwrite
         estimated parameters (raw).
         
@@ -99,7 +98,7 @@ class TerzaghiMultiLayer(torch.nn.Module):
             Dictionary of processed parameters.
         """
         # Shape of learned parameters: [time, sites, phy_param_count * nmul]
-        phy_param_count = len(self.parameter_bounds)
+        # phy_param_count = len(self.parameter_bounds)
         
         # Reshape learned parameters to [time, sites, phy_param_count, nmul]
         n_learned_layers = len(self.learnable_layers)
@@ -131,14 +130,14 @@ class TerzaghiMultiLayer(torch.nn.Module):
         )
         return param_dict
 
-    def change_param_range(param: torch.Tensor, bounds: List[float]) -> torch.Tensor:
+    def change_param_range(param: torch.Tensor, bounds: list[float]) -> torch.Tensor:
         """Change the range of a parameter to the specified bounds.
         
         Parameters
         ----------
         param : torch.Tensor
             The parameter.
-        bounds : List[float]
+        bounds : list[float]
             The parameter bounds.
         
         Returns
@@ -161,7 +160,7 @@ class TerzaghiMultiLayer(torch.nn.Module):
         phy_params : torch.Tensor
             Normalized physical parameters.
         dy_list : list
-            List of dynamic parameters.
+            list of dynamic parameters.
         
         Returns
         -------
@@ -179,7 +178,7 @@ class TerzaghiMultiLayer(torch.nn.Module):
 
             if name in dy_list:
                 dy_param = param_values[:, :, :, :]
-                drmask = torch.bernoulli(pmat).detach_().cuda() 
+                drmask = torch.bernoulli(pmat).detach_().cuda()
                 comb_param = dy_param * (1 - drmask) + static_param * drmask
                 param_dict[name] = self.change_param_range(
                     param=comb_param,
@@ -194,7 +193,7 @@ class TerzaghiMultiLayer(torch.nn.Module):
     
     def _init_layer_weights(
         self,
-        param_dict: Dict[str, torch.Tensor],
+        param_dict: dict[str, torch.Tensor],
     ) -> torch.Tensor:
         """Compute layer weights per site."""
         weights = []
@@ -216,7 +215,7 @@ class TerzaghiMultiLayer(torch.nn.Module):
     
     def _calculate_compression(
         self,
-        param_dict: Dict[str, torch.Tensor],
+        param_dict: dict[str, torch.Tensor],
         stress_delta: float,
     ) -> torch.Tensor:
         """Calculate compression for a single layer."""
@@ -245,9 +244,9 @@ class TerzaghiMultiLayer(torch.nn.Module):
 
     def forward(
             self,
-            x_dict: Dict[str, torch.Tensor],
+            x_dict: dict[str, torch.Tensor],
             parameters: torch.Tensor
-        ) -> Union[Tuple, Dict[str, torch.Tensor]]:
+        ) -> Union[tuple, dict[str, torch.Tensor]]:
         """Forward pass for TCM.
         
         Parameters
@@ -259,11 +258,11 @@ class TerzaghiMultiLayer(torch.nn.Module):
         
         Returns
         -------
-        Union[Tuple, dict]
+        Union[tuple, dict]
             Tuple or dictionary of model outputs.
         """
-        all_results = []
-        station_metrics = {}
+        # all_results = []
+        # station_metrics = {}
 
         # Unpack forcing data and expand for nmul models.
         GW = x_dict['x_phy']
@@ -313,7 +312,7 @@ class TerzaghiMultiLayer(torch.nn.Module):
         
     def PBM(
         self,
-        param_dict: Dict[str, torch.Tensor],
+        param_dict: dict[str, torch.Tensor],
         gw_level: torch.Tensor,
         prev_gw_level: torch.Tensor,
         layer_weights: torch.Tensor,
@@ -324,7 +323,7 @@ class TerzaghiMultiLayer(torch.nn.Module):
         if prev_gw_level is not None:
             # time_factors = torch.exp(-torch.arange(prev_gw_level.shape[0], device=self.device))
             # historical_effect = torch.sum(prev_gw_level * time_factors.unsqueeze(1), dim=0)
-        # else:   
+        # else:
         #     historical_effect = torch.tensor(0.0, device=self.device)
             historical_effect = torch.zeros(prev_gw_level.shape[-1])
             for i in range(prev_gw_level.shape[0]):

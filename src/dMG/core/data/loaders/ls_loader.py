@@ -2,7 +2,7 @@ import json
 import logging
 import os
 import pickle
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, dict, Optional
 
 import numpy as np
 import pandas as pd
@@ -31,7 +31,7 @@ class LsLoader(BaseLoader):
     """
     def __init__(
         self,
-        config: Dict[str, Any],
+        config: dict[str, Any],
         test_split: Optional[bool] = False,
         overwrite: Optional[bool] = False,
     ) -> None:
@@ -79,7 +79,7 @@ class LsLoader(BaseLoader):
     def _preprocess_data(
         self,
         scope: Optional[str],
-    ) -> Dict[str, NDArray[np.float32]]:
+    ) -> dict[str, NDArray[np.float32]]:
         """Read data from the dataset."""
         x_phy, c_phy, x_nn, c_nn, target = self.read_data(scope)
 
@@ -98,7 +98,7 @@ class LsLoader(BaseLoader):
         }
         return dataset
 
-    def read_data(self, scope: Optional[str]) -> Tuple[NDArray[np.float32]]:
+    def read_data(self, scope: Optional[str]) -> tuple[NDArray[np.float32]]:
         """Read data from the data file."""
         try:
             if scope == 'train':
@@ -109,19 +109,19 @@ class LsLoader(BaseLoader):
                 time = self.config['test_time']
             elif scope == 'predict':
                 data_path = self.config['observations']['test_path']
-                time = self.config['predict_time']                
+                time = self.config['predict_time']
             elif scope == 'all':
                 data_path = self.config['observations']['test_path']
                 time = self.config['all_time']
             else:
                 raise ValueError("Scope must be 'train', 'test', 'predict', or 'all'.")
         except KeyError as e:
-            raise ValueError(f"Key {e} for data path not in dataset config.")
+            raise ValueError(f"Key {e} for data path not in dataset config.") from e
         
         # Get time indicies
         all_time = pd.date_range(
             self.config['all_time'][0],
-            self.config['all_time'][-1], 
+            self.config['all_time'][-1],
             freq='d',
         )
         idx_start = all_time.get_loc(time[0])
@@ -172,7 +172,7 @@ class LsLoader(BaseLoader):
             subset_path = self.config['observations']['subset_path']
             gage_id_path = self.config['observations']['gage_info']
 
-            with open(subset_path, 'r') as f:
+            with open(subset_path) as f:
                 selected_basins = json.load(f)
             gage_info = np.load(gage_id_path)
 
@@ -229,7 +229,7 @@ class LsLoader(BaseLoader):
 
         if os.path.isfile(self.out_path) and not self.overwrite:
             if not self.norm_stats:
-                with open(self.out_path, 'r') as f:
+                with open(self.out_path) as f:
                     self.norm_stats = json.load(f)
         else:
             # Init normalization stats if file doesn't exist or overwrite is True.
@@ -240,7 +240,7 @@ class LsLoader(BaseLoader):
         x_nn: NDArray[np.float32],
         c_nn: NDArray[np.float32],
         target: NDArray[np.float32],
-    ) -> Dict[str, List[float]]:
+    ) -> dict[str, list[float]]:
         """Compile calculations of data normalization statistics."""
         stat_dict = {}
 
@@ -277,9 +277,9 @@ class LsLoader(BaseLoader):
 
     def _calc_norm_stats(
         self,
-        x: NDArray[np.float32], 
-        basin_area: NDArray[np.float32] = None, 
-    ) -> List[float]:
+        x: NDArray[np.float32],
+        basin_area: NDArray[np.float32] = None,
+    ) -> list[float]:
         """
         Calculate statistics for normalization with optional basin
         area adjustment.
@@ -314,7 +314,7 @@ class LsLoader(BaseLoader):
 
         return [p10, p90, mean, max(std, 0.001)]
     
-    def _calc_gamma_stats(self, x: NDArray[np.float32]) -> List[float]:
+    def _calc_gamma_stats(self, x: NDArray[np.float32]) -> list[float]:
         """Calculate gamma statistics for streamflow and precipitation data."""
         a = np.swapaxes(x, 1, 0).flatten()
         b = a[(~np.isnan(a))]
@@ -356,7 +356,7 @@ class LsLoader(BaseLoader):
         )
 
         # Remove nans
-        x_nn_norm[x_nn_norm != x_nn_norm] = 0    
+        x_nn_norm[x_nn_norm != x_nn_norm] = 0
         c_nn_norm[c_nn_norm != c_nn_norm] = 0
 
         c_nn_norm = np.repeat(
@@ -373,7 +373,7 @@ class LsLoader(BaseLoader):
     def _to_norm(
         self,
         data: NDArray[np.float32],
-        vars: List[str],
+        vars: list[str],
     ) -> NDArray[np.float32]:
         """Standard data normalization."""
         data_norm = np.zeros(data.shape)
@@ -401,7 +401,7 @@ class LsLoader(BaseLoader):
     def _from_norm(
         self,
         data_norm: NDArray[np.float32],
-        vars: List[str],
+        vars: list[str],
     ) -> NDArray[np.float32]:
         """De-normalize data."""
         data = np.zeros(data_norm.shape)

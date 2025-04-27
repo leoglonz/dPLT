@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Optional
 
 import numpy as np
 import torch
@@ -12,7 +12,7 @@ class LsSampler(BaseSampler):
     """Data sampler for land subsidence data."""
     def __init__(
         self,
-        config: Dict,
+        config: dict,
     ):
         super().__init__()
         self.config = config
@@ -61,10 +61,10 @@ class LsSampler(BaseSampler):
 
     def get_training_sample(
         self,
-        dataset: Dict[str, NDArray[np.float32]],
+        dataset: dict[str, NDArray[np.float32]],
         ngrid_train: int,
         nt: int,
-    ) -> Dict[str, torch.Tensor]:
+    ) -> dict[str, torch.Tensor]:
         """Generate a training batch."""
         batch_size = self.config['train']['batch_size']
         i_sample, i_t = random_index(ngrid_train, nt, (batch_size, self.rho), warm_up=self.warm_up)
@@ -80,10 +80,10 @@ class LsSampler(BaseSampler):
 
     def get_validation_sample(
         self,
-        dataset: Dict[str, torch.Tensor],
+        dataset: dict[str, torch.Tensor],
         i_s: int,
         i_e: int,
-    ) -> Dict[str, torch.Tensor]:
+    ) -> dict[str, torch.Tensor]:
         """Generate batch for model forwarding only."""
         return {
             key: (
