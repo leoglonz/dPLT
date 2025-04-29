@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from numpy.typing import NDArray
 
-from dMG.core.data import random_index
+from dMG.core.data.data import random_index
 from dMG.core.data.samplers.base import BaseSampler
 
 
@@ -17,7 +17,6 @@ class LsSampler(BaseSampler):
         super().__init__()
         self.config = config
         self.device = config['device']
-        self.warm_up = config['dpl_model']['phy_model']['warm_up']
         self.rho = config['dpl_model']['rho']
 
     def load_data(self):
@@ -38,23 +37,37 @@ class LsSampler(BaseSampler):
         has_grad: bool = False,
     ) -> torch.Tensor:
         """Select a subset of input tensor."""
-        batch_size, nx, _ = len(i_grid), x.shape[-1], x.shape[0]
+        batch_size, nx = len(i_grid), x.shape[-1]
 
         # Handle time indexing and create an empty tensor for selection
-        if i_t is not None:
-            x_tensor = torch.zeros(
-                [self.rho + self.warm_up, batch_size, nx],
-                device=self.device,
-                requires_grad=has_grad
-            )
-            for k in range(batch_size):
-                x_tensor[:, k:k + 1, :] = x[i_t[k] - self.warm_up:i_t[k] + self.rho, i_grid[k]:i_grid[k] + 1, :]
+        if len(x.shape) == 3:
+            if i_t is not None:
+                x_tensor = torch.zeros(
+                    [self.rho, batch_size, nx],
+                    device=self.device,
+                    requires_grad=has_grad
+                )
+                for k in range(batch_size):
+                    x_tensor[:, k:k + 1, :] = x[i_t[k]:i_t[k] + self.rho, i_grid[k]:i_grid[k] + 1, :]
+            else:
+                x_tensor = x[:, i_grid, :].float().to(self.device)
+        elif len(x.shape) == 4:
+            if i_t is not None:
+                x_tensor = torch.zeros(
+                    [self.rho, batch_size, x.shape[2], nx],
+                    device=self.device,
+                    requires_grad=has_grad,
+                )
+                for k in range(batch_size):
+                    x_tensor[:, k:k + 1, :, :] = x[i_t[k]:i_t[k] + self.rho, i_grid[k]:i_grid[k] + 1, :, :]
+            else:
+                x_tensor = x[:, i_grid, :, :].float().to(self.device)
         else:
-            x_tensor = x[:, i_grid, :].float().to(self.device) if x.ndim == 3 else x[i_grid, :].float().to(self.device)
+            raise ValueError("Input tensor x must be 3D or 4D.")
 
         if c is not None:
             c_tensor = torch.from_numpy(c).float().to(self.device)
-            c_tensor = c_tensor[i_grid].unsqueeze(1).repeat(1, self.rho + self.warm_up, 1)
+            c_tensor = c_tensor[i_grid].unsqueeze(1).repeat(1, self.rho, 1)
             return (x_tensor, c_tensor) if tuple_out else torch.cat((x_tensor, c_tensor), dim=2)
 
         return x_tensor
@@ -67,14 +80,14 @@ class LsSampler(BaseSampler):
     ) -> dict[str, torch.Tensor]:
         """Generate a training batch."""
         batch_size = self.config['train']['batch_size']
-        i_sample, i_t = random_index(ngrid_train, nt, (batch_size, self.rho), warm_up=self.warm_up)
+        i_sample, i_t = random_index(ngrid_train, nt, (batch_size, self.rho), warm_up=0)
 
         return {
             'x_phy': self.select_subset(dataset['x_phy'], i_sample, i_t),
-            'c_phy': dataset['c_phy'][i_sample],
-            'c_nn': dataset['c_nn'][i_sample],
+            'c_phy': self.select_subset(dataset['c_phy'], i_sample, i_t),
+            'c_nn': self.select_subset(dataset['c_nn'], i_sample, i_t),
             'xc_nn_norm': self.select_subset(dataset['xc_nn_norm'], i_sample, i_t, has_grad=False),
-            'target': self.select_subset(dataset['target'], i_sample, i_t)[self.warm_up:, :],
+            'target': self.select_subset(dataset['target'], i_sample, i_t),
             'batch_sample': i_sample,
         }
 

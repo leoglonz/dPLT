@@ -102,7 +102,7 @@ class PathBuilder(BaseModel):
         if not model_path:
             model_path = self.build_path_model()
 
-        if 'test' in self.config['mode']:
+        if ('test' in self.config['mode']) or ('train' in self.config['mode']):
             return os.path.join(
                 model_path,
                 self.test_period,
@@ -373,13 +373,13 @@ class PathBuilder(BaseModel):
             Hyperparameter details string.
         """
         norm = 'noLn'
-        norm_list = config['dpl_model']['phy_model']['use_log_norm']
+        norm_list = config['dpl_model']['phy_model'].get('use_log_norm', None)
         if norm_list:
             vars = '_'.join(norm_list)
             norm = f"Ln_{vars}"
 
         warmup = 'noWU'
-        if config['dpl_model']['phy_model']['warm_up_states']:
+        if config['dpl_model']['phy_model'].get('warm_up_states', None):
             warmup = 'WU'
 
         # Set hiddensize for single or multi-NN setups.

@@ -1,83 +1,120 @@
 defaults:
     - _self_
     - hydra: settings
-    - observations: none
+    - observations: ls_aggregate
 
 
 ## General -------------------------------#
-mode: train
-multimodel_type: none
+mode: train_test  # train, test, train_test, predict
+multimodel_type: none  # none, pnn_parallel, pnn_sequential
 random_seed: 111111
 device: cuda
-gpu_id: 0
+gpu_id: 2
 
-data_loader: base_loader
-data_sampler: base_sampler
-trainer: trainer
+data_loader: LsLoader
+data_sampler: LsSampler
+trainer: LsTrainer
 
-save_path: ../../results
+save_path: output/2lyr/
+trained_model: ''
 
 
 ## Training ------------------------------#
 train:
-    start_time: 2000/01/01
-    end_time: 2000/12/31
-    target: [y_var]
+    start_time: 2012/10/01
+    end_time: 2016/01/01
+    target: [v_disp]
     optimizer: Adadelta
-    batch_size: 100
+    batch_size: 5
     epochs: 50
     start_epoch: 0
-    save_epoch: 5
+    save_epoch: 10
 
 
-## Testing -------------------------------#
+## Evaluation -------------------------------#
 test:
-    start_time: 2001/01/01
-    end_time: 2001/12/31
-    batch_size: 100
-    test_epoch: 50
+    start_time: 2016/01/01
+    end_time: 2024/03/01
+    batch_size: 10
+    test_epoch: 1
+
+
+## Inference -------------------------------#
+predict:
+    start_time: 2016/01/01
+    end_time: 2024/03/01
+    batch_size: 10
 
 
 ## Loss Function -------------------------#
 loss_function:
-    model: RmseLossComb
+    model: NseBatchLoss  # RmseCombLoss, NseBatchLoss, KgeBatchLoss
     
 
 ## dPL Model -----------------------------#
 dpl_model:
-    rho: 365
+    rho: 12
     
     phy_model:
-        model: [None_model]
+        model: [TerzaghiMultiLayer]  
         nmul: 16
-        warm_up: 365
+        dy_drop: 0.0
+        lookback: 2
+        layer_count: 9
+        learnable_layers: [0, 1]
+        learnable_params: [
+            parLT,  # Layer thickness  <-- start w/ this
+            # parVR,  # Void Ratio
+            # parVCI,  # Virgin Compression Index  <-- start w/ this
+            # parRC,  # Recompression Index
+            # parOCR,  # Overconsolidation Ratio
+            # parK,  # Percent coarseness
+            # parMv,  # Coefficient of volume compressibility
+            # parIES,  # Initial effective stress  <-- start w/ this
+        ]
         dynamic_params:
-            None_model: [z1, z2]
+            Terzaghi: [
+            ]
+
+        nearzero: 1e-5
 
         forcings: [
-            x1_var,
-            x2_var
+            drawdown,
         ]
         attributes: [
-            attr1,
-            attr2
+            # layer_count,
+            layer_thickness,
+            vr,
+            vci,
+            ri,
+            ocr,
+            k,
+            mv,
+            ies,
         ]
 
+
     nn_model:
-        model: LSTM
+        model: CudnnLstmModel #CudnnLstmModel
         dropout: 0.5
         hidden_size: 256
         learning_rate: 1.0
-        lr_scheduler: None
+        lr_scheduler: StepLR
         lr_scheduler_params:
             step_size: 10
             gamma: 0.5
         
         forcings: [
-            x1_var,
-            x2_var
+            # drawdown,
         ]
         attributes: [
-            attr1,
-            attr2
+            # layer_count,
+            layer_thickness,
+            vr,
+            vci,
+            ri,
+            ocr,
+            k,
+            mv,
+            ies,
         ]

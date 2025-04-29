@@ -203,10 +203,10 @@ class PathBuilder(BaseModel):
         TODO: needs more thought (e.g. what is same count, different inputs?)
         ...maybe use hash.
         """
-        static_vars = config['dpl_model']['phy_model'].get('static_vars', '')
-        if static_vars == []:
-            static_vars = 0
-        return f"{config['dpl_model']['phy_model']['dynamic_vars']}dy_{static_vars}st_in"
+        attributes = config['dpl_model']['phy_model'].get('attributes', '')
+        if attributes == []:
+            attributes = 0
+        return f"{config['dpl_model']['phy_model']['forcings']}dy_{attributes}st_in"
     
     @staticmethod
     def _train_period(config: dict[str, Any], abbreviate: bool = False) -> str:

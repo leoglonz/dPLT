@@ -13,11 +13,6 @@ sys.path.append('../dMG/')  # for tutorials
 
 import numpy as np
 
-try:
-    from hydroDL2 import load_model as load_from_hydrodl
-except ImportError:
-    print("HydroDL2 not found. Continuing without it.")
-
 #------------------------------------------#
 # If directory structure changes, update these module paths.
 # NOTE: potentially move these to a framework config for easier access.
@@ -94,8 +89,10 @@ def load_component(
 def import_phy_model(model: str, ver_name: str = None) -> type:
     """Loads a physical model, either from HydroDL2 (hydrology) or locally."""
     try:
+        from hydroDL2 import load_model as load_from_hydrodl
         return load_from_hydrodl(model, ver_name)
     except ImportError:
+        print("HydroDL2 not found. Continuing without it.")
         return load_component(
             model,  # Pass model as name directly
             phy_model_dir,
@@ -206,16 +203,16 @@ def load_nn_model(
 
     # Number of inputs 'x' and outputs 'y' for the nn.
     if ensemble_list:
-        n_forcings = len(config['dynamic_vars'])
-        n_attributes = len(config['static_vars'])
+        n_forcings = len(config['forcings'])
+        n_attributes = len(config['attributes'])
         ny = len(ensemble_list)
 
         hidden_size = config['hidden_size']
         dr = config['dropout']
         name = config['model']
     else:
-        n_forcings = len(config['nn_model']['dynamic_vars'])
-        n_attributes = len(config['nn_model']['static_vars'])
+        n_forcings = len(config['nn_model']['forcings'])
+        n_attributes = len(config['nn_model']['attributes'])
         n_phy_params = phy_model.learnable_param_count
         ny = n_phy_params
 

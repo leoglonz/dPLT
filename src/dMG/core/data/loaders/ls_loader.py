@@ -2,14 +2,15 @@ import json
 import logging
 import os
 import pickle
-from typing import Any, dict, Optional
+from typing import Any, Optional
+
 
 import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 from sklearn.exceptions import DataDimensionalityWarning
 
-from dMG.core.data import intersect
+from dMG.core.data.data import intersect
 from dMG.core.data.loaders.base import BaseLoader
 
 log = logging.getLogger(__name__)
@@ -39,7 +40,7 @@ class LsLoader(BaseLoader):
         self.config = config
         self.test_split = test_split
         self.overwrite = overwrite
-        self.supported_data = ['camels_671', 'camels_531', 'prism_671', 'prism_531']
+        self.supported_data = ['ls_aggregate']
         self.data_name = config['observations']['name']
         self.nn_attributes = config['dpl_model']['nn_model'].get('attributes', [])
         self.nn_forcings = config['dpl_model']['nn_model'].get('forcings', [])
@@ -49,7 +50,7 @@ class LsLoader(BaseLoader):
         self.all_attributes = self.config['observations']['attributes_all']
 
         self.target = config['train']['target']
-        self.log_norm_vars = config['dpl_model']['phy_model']['use_log_norm']
+        self.log_norm_vars = config['dpl_model']['phy_model'].get('use_log_norm', [])
         self.device = config['device']
         self.dtype = config['dtype']
         
@@ -84,7 +85,7 @@ class LsLoader(BaseLoader):
         x_phy, c_phy, x_nn, c_nn, target = self.read_data(scope)
 
         # Normalize nn input data
-        self.load_norm_stats(x_nn, c_nn, target, scope)
+        self.load_norm_stats()
         xc_nn_norm = self.normalize(x_nn, c_nn)
 
         # Build data dict of Torch tensors
@@ -122,16 +123,25 @@ class LsLoader(BaseLoader):
         all_time = pd.date_range(
             self.config['all_time'][0],
             self.config['all_time'][-1],
-            freq='d',
+            freq='MS',
         )
         idx_start = all_time.get_loc(time[0])
         idx_end = all_time.get_loc(time[-1]) + 1
 
         # Load data
         with open(data_path, 'rb') as f:
-            forcings, target, attributes = pickle.load(f)
+            data = pickle.load(f)
 
-        forcings = np.transpose(forcings[:, idx_start:idx_end], (1,0,2))
+        forcings = data['forcing']  # [nt, nb, nforc]
+        attributes = data['attributes']  # [nt, nb, nlayer, nattr]
+        target = data['target']  # [nt, nb]
+        del data
+
+        if len(forcings.shape) < 3:
+            forcings = forcings[:,:, np.newaxis]
+
+        if len(target.shape) < 3:
+            target = target[:, :, np.newaxis]
 
         # Forcing subset for phy model
         phy_forc_idx = []
@@ -161,71 +171,29 @@ class LsLoader(BaseLoader):
                 raise ValueError(f"Attribute {attr} not in the list of all attributes.")
             nn_attr_idx.append(self.all_attributes.index(attr))
 
-        x_phy = forcings[:,:, phy_forc_idx]
-        c_phy = attributes[:, phy_attr_idx]
-        x_nn = forcings[:,:, nn_forc_idx]
-        c_nn = attributes[:, nn_attr_idx]
-        target = np.transpose(target[:, idx_start:idx_end], (1,0,2))
+        # For norm_stats file
+        self.full_forc = forcings
+        self.full_attr = attributes
+        self.full_target = target
 
-        # Subset basins if necessary
-        if self.data_name.split('_')[-1] != '671':
-            subset_path = self.config['observations']['subset_path']
-            gage_id_path = self.config['observations']['gage_info']
+        x_phy = forcings[idx_start:idx_end, :, phy_forc_idx]
+        c_phy = attributes[idx_start:idx_end, :, :, phy_attr_idx]
+        x_nn = forcings[idx_start:idx_end, :, nn_forc_idx]
+        c_nn = attributes[idx_start:idx_end, :, :, nn_attr_idx]
+        target = target[idx_start:idx_end, :, :]
 
-            with open(subset_path) as f:
-                selected_basins = json.load(f)
-            gage_info = np.load(gage_id_path)
-
-            subset_idx = intersect(selected_basins, gage_info)
-
-            x_phy = x_phy[:, subset_idx, :]
-            c_phy = c_phy[subset_idx, :]
-            x_nn = x_nn[:, subset_idx, :]
-            c_nn = c_nn[subset_idx, :]
-            target = target[:, subset_idx, :]
-
-        # Convert flow to mm/day if necessary
-        target = self._flow_conversion(c_nn, target)
+        # Collapse attribute and layer dimensions
+        c_phy = c_phy.reshape(c_phy.shape[0], c_phy.shape[1], -1)
+        c_nn = c_nn.reshape(c_nn.shape[0], c_nn.shape[1], -1)
 
         return x_phy, c_phy, x_nn, c_nn, target
-    
-    def _flow_conversion(self, c_nn, target) -> NDArray[np.float32]:
-        """Convert hydraulic flow from ft3/s to mm/day."""
-        for name in ['flow_sim', 'streamflow', 'sf']:
-            if name in self.target:
-                target_temp = target[:, :, self.target.index(name)]
-                area_name = self.config['observations']['area_name']
-                basin_area = c_nn[:, self.nn_attributes.index(area_name)]
-
-                area = np.expand_dims(basin_area, axis=0).repeat(target_temp.shape[0], 0)
-                target[:, :, self.target.index(name)] = (
-                    (10 ** 3) * target_temp * 0.0283168 * 3600 * 24 / (area * (10 ** 6))
-                )
-        return target
         
-    def load_norm_stats(
-        self,
-        x_nn: NDArray[np.float32],
-        c_nn: NDArray[np.float32],
-        target: NDArray[np.float32],
-        scope: str,
-    ) -> None:
-        """Load or calculate normalization statistics if necessary.
-        
-        A different normalization file is loaded for training and testing data.
-        """
-        if scope == 'train':
-            self.out_path = os.path.join(
-                self.config['model_path'],
-                'normalization_statistics.json',
-            )
-        elif scope in ['test', 'predict']:
-            self.out_path = os.path.join(
-                self.config['out_path'],
-                'normalization_statistics.json',
-            )
-        else:
-            raise ValueError(f"Unsupported scope {scope}.")
+    def load_norm_stats(self) -> None:
+        """Load or calculate normalization statistics if necessary."""
+        self.out_path = os.path.join(
+            self.config['model_path'],
+            'normalization_statistics.json',
+        )
 
         if os.path.isfile(self.out_path) and not self.overwrite:
             if not self.norm_stats:
@@ -233,7 +201,10 @@ class LsLoader(BaseLoader):
                     self.norm_stats = json.load(f)
         else:
             # Init normalization stats if file doesn't exist or overwrite is True.
-            self.norm_stats = self._init_norm_stats(x_nn, c_nn, target)
+            self.norm_stats = self._init_norm_stats(
+                self.full_forc, self.full_attr, self.full_target
+            )
+        del self.full_forc, self.full_attr, self.full_target
     
     def _init_norm_stats(
         self,
@@ -260,15 +231,9 @@ class LsLoader(BaseLoader):
 
         # Target variable stats
         for i, name in enumerate(self.target):
-            if name in ['flow_sim', 'streamflow', 'sf']:
-                stat_dict[name] = self._calc_norm_stats(
-                    np.swapaxes(target[:, :, i:i+1], 1, 0).copy(),
-                    basin_area,
-                )
-            else:
-                stat_dict[name] = self._calc_norm_stats(
-                    np.swapaxes(target[:, :, i:i+1], 1, 0),
-                )
+            stat_dict[name] = self._calc_norm_stats(
+                np.swapaxes(target[:, :, i:i+1], 1, 0),
+            )
 
         with open(self.out_path, 'w') as f:
             json.dump(stat_dict, f, indent=4)
@@ -359,13 +324,10 @@ class LsLoader(BaseLoader):
         x_nn_norm[x_nn_norm != x_nn_norm] = 0
         c_nn_norm[c_nn_norm != c_nn_norm] = 0
 
-        c_nn_norm = np.repeat(
-            np.expand_dims(c_nn_norm, 0),
-            x_nn_norm.shape[0],
-            axis=0
-        )
-
-        xc_nn_norm = np.concatenate((x_nn_norm, c_nn_norm), axis=2)
+        if self.nn_forcings == []:
+            xc_nn_norm = c_nn_norm.copy()
+        else:
+            xc_nn_norm = np.concatenate((x_nn_norm, c_nn_norm), axis=2)
         del x_nn_norm, c_nn_norm, x_nn
 
         return xc_nn_norm
@@ -381,22 +343,17 @@ class LsLoader(BaseLoader):
         for k, var in enumerate(vars):
             stat = self.norm_stats[var]
 
-            if len(data.shape) == 3:
+            if len(data.shape) == 4:
+                if var in self.log_norm_vars:
+                    data[:, :, :, k] = np.log10(np.sqrt(data[:, :, :, k]) + 0.1)
+                data_norm[:, :, :, k] = (data[:, :, :, k] - stat[2]) / stat[3]
+            elif len(data.shape) == 3:
                 if var in self.log_norm_vars:
                     data[:, :, k] = np.log10(np.sqrt(data[:, :, k]) + 0.1)
                 data_norm[:, :, k] = (data[:, :, k] - stat[2]) / stat[3]
-            elif len(data.shape) == 2:
-                if var in self.log_norm_vars:
-                    data[:, k] = np.log10(np.sqrt(data[:, k]) + 0.1)
-                data_norm[:, k] = (data[:, k] - stat[2]) / stat[3]
             else:
-                raise DataDimensionalityWarning("Data dimension must be 2 or 3.")
-
-        # Should be external, except altering order of first two dims augments normalization.
-        if len(data_norm.shape) < 3:
-            return data_norm
-        else:
-            return np.swapaxes(data_norm, 1, 0)
+                raise DataDimensionalityWarning("Data dimension must be 3 or 4.")
+        return data_norm
 
     def _from_norm(
         self,

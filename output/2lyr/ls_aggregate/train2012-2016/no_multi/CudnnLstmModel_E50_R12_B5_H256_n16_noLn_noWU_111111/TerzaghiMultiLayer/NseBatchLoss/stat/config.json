@@ -1,0 +1,139 @@
+{
+    "mode": "train_test",
+    "multimodel_type": null,
+    "random_seed": 111111,
+    "device": "cuda:2",
+    "gpu_id": 2,
+    "data_loader": "LsLoader",
+    "data_sampler": "LsSampler",
+    "trainer": "LsTrainer",
+    "save_path": "output/2lyr/",
+    "trained_model": "",
+    "train": {
+        "start_time": "2012/10/01",
+        "end_time": "2016/01/01",
+        "target": [
+            "v_disp"
+        ],
+        "optimizer": "Adadelta",
+        "batch_size": 5,
+        "epochs": 50,
+        "start_epoch": 0,
+        "save_epoch": 10
+    },
+    "test": {
+        "start_time": "2016/01/01",
+        "end_time": "2024/03/01",
+        "batch_size": 10,
+        "test_epoch": 1
+    },
+    "predict": {
+        "start_time": "2016/01/01",
+        "end_time": "2024/03/01",
+        "batch_size": 10
+    },
+    "loss_function": {
+        "model": "NseBatchLoss"
+    },
+    "dpl_model": {
+        "rho": 12,
+        "phy_model": {
+            "model": [
+                "TerzaghiMultiLayer"
+            ],
+            "nmul": 16,
+            "dy_drop": 0.0,
+            "lookback": 2,
+            "layer_count": 9,
+            "learnable_layers": [
+                0,
+                1
+            ],
+            "learnable_params": [
+                "parLT"
+            ],
+            "dynamic_params": {
+                "Terzaghi": []
+            },
+            "nearzero": 1e-05,
+            "forcings": [
+                "drawdown"
+            ],
+            "attributes": [
+                "layer_thickness",
+                "vr",
+                "vci",
+                "ri",
+                "ocr",
+                "k",
+                "mv",
+                "ies"
+            ]
+        },
+        "nn_model": {
+            "model": "CudnnLstmModel",
+            "dropout": 0.5,
+            "hidden_size": 256,
+            "learning_rate": 1.0,
+            "lr_scheduler": "StepLR",
+            "lr_scheduler_params": {
+                "step_size": 10,
+                "gamma": 0.5
+            },
+            "forcings": [],
+            "attributes": [
+                "layer_thickness",
+                "vr",
+                "vci",
+                "ri",
+                "ocr",
+                "k",
+                "mv",
+                "ies"
+            ]
+        }
+    },
+    "observations": {
+        "name": "ls_aggregate",
+        "train_path": "/projects/mhpi/leoglonz/data/extracted/land_subsidence/ls_train",
+        "test_path": "/projects/mhpi/leoglonz/data/extracted/land_subsidence/ls_train",
+        "start_time": "2012/10/01",
+        "end_time": "2024/03/01",
+        "forcings_all": [
+            "drawdown"
+        ],
+        "attributes_all": [
+            "layer_thickness",
+            "vr",
+            "vci",
+            "ri",
+            "ocr",
+            "k",
+            "mv",
+            "ies"
+        ]
+    },
+    "dtype": "torch.float32",
+    "train_time": [
+        "2012/10/01",
+        "2016/01/01"
+    ],
+    "test_time": [
+        "2016/01/01",
+        "2024/03/01"
+    ],
+    "predict_time": [
+        "2016/01/01",
+        "2024/03/01"
+    ],
+    "experiment_time": [
+        "2012/10/01",
+        "2024/03/01"
+    ],
+    "all_time": [
+        "2012/10/01",
+        "2024/03/01"
+    ],
+    "model_path": "output/2lyr/ls_aggregate/train2012-2016/no_multi/CudnnLstmModel_E50_R12_B5_H256_n16_noLn_noWU_111111/TerzaghiMultiLayer/NseBatchLoss/stat/",
+    "out_path": "output/2lyr/ls_aggregate/train2012-2016/no_multi/CudnnLstmModel_E50_R12_B5_H256_n16_noLn_noWU_111111/TerzaghiMultiLayer/NseBatchLoss/stat/test2016-2024_Ep1"
+}

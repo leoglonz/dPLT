@@ -5,7 +5,7 @@ import hydra
 import torch
 from omegaconf import DictConfig
 
-from dMG.core.utils import initialize_config, print_config, set_randomseed
+from dMG.core.utils.utils import initialize_config, print_config, set_randomseed
 from dMG.core.utils.factory import import_data_loader, import_trainer
 from dMG.models.model_handler import ModelHandler as dModel
 
@@ -46,7 +46,7 @@ def main(config: DictConfig) -> None:
         print_config(config)
 
         ### Create/Load differentiable model ###
-        model = dModel(config, verbose=True)
+        model = dModel(config)
 
         ### Process datasets ###
         log.info("Processing datasets...")

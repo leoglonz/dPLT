@@ -12,7 +12,7 @@ sys.path.append(os.path.abspath('..'))  # Add the parent directory of `scripts` 
 
 from dMG import load_nn_model
 from scripts import load_config
-from src.dMG.models.phy_models.terzaghi import TerzaghiMultiLayer as dPLT
+from dMG.models.phy_models.terzaghi_multi_layer import TerzaghiMultiLayer as dPLT
 
 #------------------------------------------#
 # Define model settings here.
