@@ -15,28 +15,30 @@ data_loader: LsLoader
 data_sampler: LsSampler
 trainer: LsTrainer
 
-save_path: output/2lyr/
+save_path: output/29apr2/
 trained_model: ''
 
 
 ## Training ------------------------------#
 train:
     start_time: 2012/10/01
-    end_time: 2016/01/01
+    end_time: 2020/01/01
     target: [v_disp]
     optimizer: Adadelta
     batch_size: 5
-    epochs: 50
+    epochs: 3
     start_epoch: 0
-    save_epoch: 10
+    save_epoch: 1
 
 
 ## Evaluation -------------------------------#
 test:
-    start_time: 2016/01/01
-    end_time: 2024/03/01
+    start_time: 2012/10/01
+    end_time: 2020/01/01
+    # start_time: 2020/01/01
+    # end_time: 2024/03/01
     batch_size: 10
-    test_epoch: 1
+    test_epoch: 3
 
 
 ## Inference -------------------------------#
@@ -56,12 +58,13 @@ dpl_model:
     rho: 12
     
     phy_model:
-        model: [TerzaghiMultiLayer]  
-        nmul: 16
+        model: [TerzaghiMultiLayer]
+        dpl: True
+        nmul: 4
         dy_drop: 0.0
         lookback: 2
         layer_count: 9
-        learnable_layers: [0, 1]
+        learnable_layers: [0, 1, 2, 3, 4, 5]
         learnable_params: [
             parLT,  # Layer thickness  <-- start w/ this
             # parVR,  # Void Ratio
@@ -93,12 +96,11 @@ dpl_model:
             ies,
         ]
 
-
     nn_model:
         model: CudnnLstmModel #CudnnLstmModel
         dropout: 0.5
         hidden_size: 256
-        learning_rate: 1.0
+        learning_rate: 0.1
         lr_scheduler: StepLR
         lr_scheduler_params:
             step_size: 10

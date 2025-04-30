@@ -312,7 +312,7 @@ class LsLoader(BaseLoader):
         """Normalize data for neural network."""
         # TODO: Add np.swapaxes(x_nn, 1, 0) here and remove from _to_norm. This changes normalization, need to determine if it's detrimental.
         x_nn_norm = self._to_norm(
-            np.swapaxes(x_nn, 1, 0).copy(),
+            x_nn,
             self.nn_forcings,
         )
         c_nn_norm = self._to_norm(

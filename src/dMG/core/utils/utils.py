@@ -254,7 +254,7 @@ def save_outputs(config, predictions, y_obs=None, create_dirs=False) -> None:
             if len(predictions[0][key].shape) == 3:
                 dim = 1
             else:
-                dim = 0
+                dim = 1
 
             c_tensor = torch.cat([d[key] for d in predictions], dim=dim)
             file_name = key + ".npy"

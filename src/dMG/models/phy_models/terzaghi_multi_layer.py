@@ -121,13 +121,14 @@ class TerzaghiMultiLayer(torch.nn.Module):
 
         # Overwrite estimate params with learned params for specific layers/params.
         # Iterate over the learned layers and parameters.
-        for i, layer_idx in enumerate(self.learnable_layers):
-            for j, name in enumerate(self.learnable_params):
-                descaled_param = self.descale_param(
-                    learned_params[:, :, i, j, :], name
-                )
-                param_idx = self.param_names.index(name)
-                param_dict[:, :, layer_idx, param_idx, :] = descaled_param
+        if self.config['dpl']:
+            for i, layer_idx in enumerate(self.learnable_layers):
+                for j, name in enumerate(self.learnable_params):
+                    descaled_param = self.descale_param(
+                        learned_params[:, :, i, j, :], name
+                    )
+                    param_idx = self.param_names.index(name)
+                    param_dict[:, :, layer_idx, param_idx, :] = descaled_param
         return param_dict
 
     def change_param_range(self, param: torch.Tensor, bounds: list[float]) -> torch.Tensor:
@@ -202,7 +203,7 @@ class TerzaghiMultiLayer(torch.nn.Module):
     ) -> torch.Tensor:
         """Calculate compression for a single layer."""
         if torch.abs(stress_delta) < 1e-6:
-            return torch.tensor(0.0, dtype=torch.float32, device=self.device)
+            return torch.tensor(0.0, device=self.device)
 
         stress_0 = torch.clamp(param_dict['parIES'], min=self.min_stress)
         stress_final = torch.clamp(stress_0 + stress_delta, min=self.min_stress)
@@ -307,10 +308,11 @@ class TerzaghiMultiLayer(torch.nn.Module):
             # time_factors = torch.exp(-torch.arange(prev_gw_level.shape[0], device=self.device))
             # historical_effect = torch.sum(prev_gw_level * time_factors.unsqueeze(1), dim=0)
         # else:
-        #     historical_effect = torch.tensor(0.0, device=self.device)
             historical_effect = torch.tensor(0.0, device=self.device)
             for i in range(prev_gw_level.shape[0]):
-                historical_effect += prev_gw_level[i] * np.exp(-prev_gw_level.shape[0] - i)
+                historical_effect += prev_gw_level[i] * np.exp(-prev_gw_level.shape[0] + i)
+            # gw_level += 0.3 * historical_effect
+            # historical_effect = torch.sum(prev_gw_level * torch.exp(-torch.arange(prev_gw_level.shape[0], device=self.device)))
             gw_level += 0.3 * historical_effect
 
         # Loop through layers
@@ -329,4 +331,4 @@ class TerzaghiMultiLayer(torch.nn.Module):
             total_disp += compression * layer_weights[i]
 
         # Convert to mm
-        return total_disp * 10
+        return total_disp * 1000

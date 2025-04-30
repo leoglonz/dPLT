@@ -333,7 +333,7 @@ class LsTrainer(BaseTrainer):
                 if len(batch_list[0][key].shape) == 3:
                     dim = 1
                 else:
-                    dim = 0
+                    dim = 1
                 data[key] = torch.cat([d[key] for d in batch_list], dim=dim).cpu().numpy()
             return data
 
@@ -397,10 +397,6 @@ class LsTrainer(BaseTrainer):
         target_name = self.config['train']['target'][0]
         predictions = self._batch_data(batch_predictions, target_name)
         target = np.expand_dims(observations[:, :, 0].cpu().numpy(), 2)
-
-        # Remove warm-up data
-        # if self.config['dpl_model']['phy_model']['warm_up_states']:  # NOTE: remove if bug does not reoccur
-        target = target[self.config['dpl_model']['phy_model']['warm_up']:, :]
 
         # Compute metrics
         metrics = Metrics(
