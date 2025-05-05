@@ -104,7 +104,7 @@ class TerzaghiMultiLayer(torch.nn.Module):
         # Reshape learned parameters to [time, sites, layers, parameters, nmul]
         n_learned_layers = len(self.learnable_layers)
         n_learned_params = len(self.learnable_params)
-        learned_params = torch.sigmoid(parameters).view(
+        learned_params = torch.nn.functional.softplus(parameters).view(
             parameters.shape[0],  # time
             parameters.shape[1],  # sites
             n_learned_layers,
@@ -254,9 +254,9 @@ class TerzaghiMultiLayer(torch.nn.Module):
         n_steps, n_sites, _ = GW.size()
 
         # Unpack parameters
-        param_dict = self.unpack_parameters(parameters, x_dict['c_phy'])
+        param_array = self.unpack_parameters(parameters, x_dict['c_phy'])
 
-        # Initialize model state
+        # Initialize model sstate
         vert_displacement = torch.zeros(
             [n_steps, n_sites, self.nmul],
             dtype=torch.float32,
@@ -268,7 +268,7 @@ class TerzaghiMultiLayer(torch.nn.Module):
             for m in range(self.nmul):
                 site_params = {}
                 for k, name in enumerate(self.param_names):
-                    site_params[name] = param_dict[:, i, :, k, m]
+                    site_params[name] = param_array[:, i, :, k, m]
                 
                 layer_weights = self._init_layer_weights(site_params)
                 

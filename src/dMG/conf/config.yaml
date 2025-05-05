@@ -9,7 +9,7 @@ mode: train_test  # train, test, train_test, predict
 multimodel_type: none  # none, pnn_parallel, pnn_sequential
 random_seed: 111111
 device: cuda
-gpu_id: 2
+gpu_id: 5
 
 data_loader: LsLoader
 data_sampler: LsSampler
@@ -64,7 +64,7 @@ dpl_model:
         dy_drop: 0.0
         lookback: 2
         layer_count: 9
-        learnable_layers: [0, 1, 2, 3, 4, 5]
+        learnable_layers: [0]
         learnable_params: [
             parLT,  # Layer thickness  <-- start w/ this
             # parVR,  # Void Ratio
