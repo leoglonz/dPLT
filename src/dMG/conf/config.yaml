@@ -5,7 +5,7 @@ defaults:
 
 
 ## General -------------------------------#
-mode: train_test  # train, test, train_test, predict
+mode: test  # train, test, train_test, predict
 multimodel_type: none  # none, pnn_parallel, pnn_sequential
 random_seed: 111111
 device: cuda
@@ -15,7 +15,7 @@ data_loader: LsLoader
 data_sampler: LsSampler
 trainer: LsTrainer
 
-save_path: output/29apr2/
+save_path: output/may6_2/
 trained_model: ''
 
 
@@ -26,7 +26,7 @@ train:
     target: [v_disp]
     optimizer: Adadelta
     batch_size: 5
-    epochs: 3
+    epochs: 10
     start_epoch: 0
     save_epoch: 1
 
@@ -38,7 +38,7 @@ test:
     # start_time: 2020/01/01
     # end_time: 2024/03/01
     batch_size: 10
-    test_epoch: 3
+    test_epoch: 10
 
 
 ## Inference -------------------------------#
@@ -55,23 +55,23 @@ loss_function:
 
 ## dPL Model -----------------------------#
 dpl_model:
-    rho: 12
+    rho: 24
     
     phy_model:
         model: [TerzaghiMultiLayer]
         dpl: True
         nmul: 4
         dy_drop: 0.0
-        lookback: 2
+        lookback: 4
         layer_count: 9
-        learnable_layers: [0]
+        learnable_layers: [0, 1, 2, 3, 4, 5, 6, 7, 8]
         learnable_params: [
             parLT,  # Layer thickness  <-- start w/ this
             # parVR,  # Void Ratio
             # parVCI,  # Virgin Compression Index  <-- start w/ this
             # parRC,  # Recompression Index
             # parOCR,  # Overconsolidation Ratio
-            # parK,  # Percent coarseness
+            parK,  # Percent coarseness
             # parMv,  # Coefficient of volume compressibility
             # parIES,  # Initial effective stress  <-- start w/ this
         ]

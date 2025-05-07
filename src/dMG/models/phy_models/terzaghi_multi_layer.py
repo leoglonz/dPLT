@@ -191,8 +191,10 @@ class TerzaghiMultiLayer(torch.nn.Module):
             weights.append(weight)
         weights = torch.stack(weights, dim=1)  # Shape: [batch_size, layer_count]
 
-        total_weight = torch.sum(weights, dim=1, keepdim=True)
-        weights = torch.where(total_weight > 0, weights / total_weight, weights)
+        # total_weight = torch.sum(weights, dim=1, keepdim=True)
+        # weights = torch.where(total_weight > 0, weights / total_weight, weights)
+        total_weight = weights.sum(dim=1, keepdim=True).clamp(min=self.nearzero)
+        weights = weights / total_weight
 
         return weights
     
@@ -305,15 +307,14 @@ class TerzaghiMultiLayer(torch.nn.Module):
         total_disp = 0.0
 
         if prev_gw_level is not None:
-            # time_factors = torch.exp(-torch.arange(prev_gw_level.shape[0], device=self.device))
-            # historical_effect = torch.sum(prev_gw_level * time_factors.unsqueeze(1), dim=0)
-        # else:
             historical_effect = torch.tensor(0.0, device=self.device)
             for i in range(prev_gw_level.shape[0]):
-                historical_effect += prev_gw_level[i] * np.exp(-prev_gw_level.shape[0] + i)
+                prev = torch.tensor(prev_gw_level.shape[0], device=self.device)
+                historical_effect += prev_gw_level[i] * torch.exp(-prev + i)
+
+            # decay = torch.exp(-torch.arange(prev_gw_level.shape[0] - 1, -1, -1, device=self.device))
+            # historical_effect = torch.sum(prev_gw_level * decay)
             # gw_level += 0.3 * historical_effect
-            # historical_effect = torch.sum(prev_gw_level * torch.exp(-torch.arange(prev_gw_level.shape[0], device=self.device)))
-            gw_level += 0.3 * historical_effect
 
         # Loop through layers
         for i in range(self.layer_count):
@@ -331,4 +332,4 @@ class TerzaghiMultiLayer(torch.nn.Module):
             total_disp += compression * layer_weights[i]
 
         # Convert to mm
-        return total_disp * 1000
+        return total_disp
